@@ -95,6 +95,8 @@ def install(settings, install_system=False, skip_download=False, log=print):
                 constraints,
                 "--index-url",
                 index,
+                "--index-strategy",
+                "unsafe-best-match",
             ]
             if profile != "macos":
                 url = (
