@@ -1,0 +1,2170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qwen3-TTS · 角色台词编辑器</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      font-size: 12px;
+      color: #cfd4da;
+      background: #0c0e11;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ============ 顶部 ============ */
+    header {
+      flex: 0 0 auto;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      background: #111418;
+      border-bottom: 1px solid #1e2126;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .brand .logo {
+      font-size: 16px;
+    }
+
+    .brand .title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e6ebf0;
+      letter-spacing: .5px;
+    }
+
+    .brand .subtitle {
+      font-size: 10px;
+      color: #586069;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    .queue-indicator {
+      font: 10px monospace;
+      color: #e6b800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(230, 184, 0, .08);
+      border: 1px solid rgba(230, 184, 0, .25);
+      display: none;
+    }
+
+    .queue-indicator.on {
+      display: inline-block;
+    }
+
+    .tool-btn {
+      padding: 6px 12px;
+      font-size: 11px;
+      color: #b8bfc6;
+      background: #1a1d22;
+      border: 1px solid #2a2e35;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all .1s;
+    }
+
+    .tool-btn:hover:not(:disabled) {
+      background: #22262c;
+      color: #e6ebf0;
+      border-color: #3a4048;
+    }
+
+    .tool-btn:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+    }
+
+    .tool-btn.primary {
+      color: #72e68a;
+      border-color: #2f5a3a;
+      background: #16261b;
+    }
+
+    .tool-btn.primary:hover:not(:disabled) {
+      background: #1d3424;
+    }
+
+    .tool-btn.danger {
+      color: #e66;
+      border-color: #5a2828;
+    }
+
+    .tool-btn.danger:hover:not(:disabled) {
+      background: #2b1a1a;
+    }
+
+    /* ============ 布局 ============ */
+    .layout {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    aside {
+      flex: 0 0 300px;
+      overflow-y: auto;
+      background: #0f1216;
+      border-right: 1px solid #1e2126;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    aside::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    aside::-webkit-scrollbar-thumb {
+      background: #23272e;
+      border-radius: 3px;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    footer {
+      flex: 0 0 auto;
+      height: 26px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font: 11px monospace;
+      color: #586069;
+      background: #111418;
+      border-top: 1px solid #1e2126;
+    }
+
+    footer .stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    footer .stat b {
+      color: #8a949e;
+      font-weight: 600;
+    }
+
+    footer .sep {
+      color: #2a2e35;
+    }
+
+    /* ============ 侧栏卡片 ============ */
+    .card {
+      background: #14171c;
+      border: 1px solid #1e2228;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .card h3 {
+      margin: 0 0 10px 0;
+      font-size: 10px;
+      font-weight: 700;
+      color: #6a737d;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card h3 .badge {
+      font: 10px monospace;
+      font-weight: 400;
+      color: #586069;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .field {
+      margin-bottom: 8px;
+    }
+
+    .field:last-child {
+      margin-bottom: 0;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 10px;
+      color: #586069;
+      letter-spacing: .5px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-family: inherit;
+      color: #c8ced5;
+      background: #0c0e11;
+      border: 1px solid #2a2e35;
+      border-radius: 5px;
+      outline: none;
+      transition: border-color .1s, background .1s, color .1s;
+    }
+
+    input:hover,
+    select:hover,
+    textarea:hover {
+      border-color: #3a4048;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: #4a7ef2;
+      background: #0e1116;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 72px;
+      line-height: 1.5;
+      cursor: text;
+    }
+
+    select {
+      cursor: pointer;
+    }
+
+    select option {
+      background: #14171c;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 600;
+      color: #b8bfc6;
+      background: #1a1d22;
+      border: 1px solid #2a2e35;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all .1s;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: #22262c;
+      color: #e6ebf0;
+      border-color: #3a4048;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .btn:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+    }
+
+    .btn.primary {
+      color: #72e68a;
+      border-color: #2f5a3a;
+      background: #16261b;
+    }
+
+    .btn.primary:hover:not(:disabled) {
+      background: #1d3424;
+    }
+
+    .btn.small {
+      font-size: 11px;
+      padding: 6px 8px;
+      font-weight: 400;
+    }
+
+    .gen-status {
+      font: 10px monospace;
+      color: #586069;
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .gen-status.gen {
+      color: #e6b800;
+    }
+
+    .gen-status.ok {
+      color: #72e68a;
+    }
+
+    .gen-status.err {
+      color: #e66;
+    }
+
+    /* ============ 列表 ============ */
+    .list-header,
+    .clip-row {
+      display: grid;
+      grid-template-columns:
+        20px
+        /* grip */
+        26px
+        /* idx */
+        108px
+        /* 角色 */
+        96px
+        /* 情感 */
+        minmax(140px, 1fr)
+        /* 文本 */
+        96px
+        /* 设备 */
+        96px
+        /* 信号 */
+        54px
+        /* 延迟 */
+        26px 26px 26px;
+      /* ▶ ↻ × */
+      gap: 4px;
+      align-items: center;
+    }
+
+    .list-header {
+      flex: 0 0 auto;
+      padding: 6px 10px;
+      background: #111418;
+      border-bottom: 1px solid #1e2126;
+      font: 10px monospace;
+      color: #586069;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    .list-header .hdr {
+      text-align: center;
+    }
+
+    .list-header .hdr.left {
+      text-align: left;
+      padding-left: 2px;
+    }
+
+    .list {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .list::-webkit-scrollbar-thumb {
+      background: #23272e;
+      border-radius: 4px;
+    }
+
+    .list::-webkit-scrollbar-thumb:hover {
+      background: #2e333b;
+    }
+
+    /* 行：用 --role-* 变量着色，左竖条用 ::before */
+    .clip-row {
+      padding: 5px 10px;
+      border-bottom: 1px solid #16191d;
+      font-size: 11px;
+      position: relative;
+      transition: background .1s;
+    }
+
+    .clip-row:hover {
+      background: rgba(255, 255, 255, .02);
+    }
+
+    .clip-row::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--role-color, transparent);
+      transition: background .1s;
+    }
+
+    .clip-row.playing::before {
+      background: #72e68a;
+    }
+
+    .clip-row.queued::before {
+      background: #a8a862;
+    }
+
+    .clip-row.generating::before {
+      background: #e6b800;
+    }
+
+    .clip-row.playing {
+      background: rgba(114, 230, 138, .05);
+    }
+
+    .clip-row.queued {
+      background: rgba(168, 168, 98, .05);
+    }
+
+    .clip-row.generating {
+      background: rgba(230, 184, 0, .07);
+    }
+
+    .clip-row.dirty {
+      background: rgba(91, 141, 239, .05);
+    }
+
+    .clip-row.dragging {
+      opacity: .3;
+    }
+
+    .clip-row.drop-target {
+      box-shadow: inset 0 -2px 0 #72e68a;
+    }
+
+    .grip {
+      text-align: center;
+      font-size: 13px;
+      line-height: 1;
+      color: #3a4048;
+      cursor: grab;
+      user-select: none;
+      letter-spacing: -2px;
+      padding: 2px 0;
+    }
+
+    .grip:hover {
+      color: #8a949e;
+      background: #1a1d22;
+    }
+
+    .grip:active {
+      cursor: grabbing;
+    }
+
+    .grip[aria-disabled="true"] {
+      opacity: .2;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .idx {
+      text-align: right;
+      padding-right: 4px;
+      font: 10px monospace;
+      color: #4a5159;
+    }
+
+    .clip-row.playing .idx {
+      color: #72e68a;
+    }
+
+    .cell-input,
+    .cell-select {
+      width: 100%;
+      padding: 4px 7px;
+      font-size: 11px;
+      font-family: inherit;
+      color: #c8ced5;
+      background: #0e1116;
+      border: 1px solid #23272e;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color .1s, color .1s, background .1s;
+    }
+
+    .cell-input:focus,
+    .cell-select:focus {
+      border-color: #4a7ef2;
+    }
+
+    .cell-input:hover:not(:disabled),
+    .cell-select:hover:not(:disabled) {
+      border-color: #3a4048;
+    }
+
+    .cell-input:disabled,
+    .cell-select:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    /* 角色：着色 */
+    .role-select {
+      background: var(--role-bg, #0e1116);
+      color: var(--role-fg, #c8ced5);
+      border-color: var(--role-border, #23272e);
+      font-weight: 600;
+    }
+
+    .role-select:hover:not(:disabled) {
+      border-color: var(--role-fg, #3a4048);
+    }
+
+    .role-select option {
+      background: #0e1116;
+      color: #c8ced5;
+    }
+
+    /* 情感：跟随角色，色淡一些 */
+    .emo-select {
+      color: var(--role-fg, #c8ced5);
+      border-color: var(--role-border, #23272e);
+    }
+
+    .text-cell {
+      cursor: text;
+      min-width: 0;
+    }
+
+    .text-cell.changed {
+      color: #8fb8f2;
+      border-color: #2a3d5a;
+    }
+
+    .delay-wrap {
+      position: relative;
+    }
+
+    .delay-wrap .cell-input {
+      padding-right: 16px;
+      text-align: center;
+    }
+
+    .delay-wrap::after {
+      content: "s";
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 9px;
+      color: #4a5159;
+      pointer-events: none;
+    }
+
+    .icon-btn {
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      font-size: 12px;
+      line-height: 24px;
+      text-align: center;
+      color: #6a737d;
+      background: #16191d;
+      border: 1px solid #23272e;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all .1s;
+    }
+
+    .icon-btn:hover:not(:disabled) {
+      background: #1e2228;
+      color: #cfd4da;
+    }
+
+    .icon-btn:disabled {
+      opacity: .25;
+      cursor: not-allowed;
+    }
+
+    .icon-btn.play:hover:not(:disabled) {
+      color: #72e68a;
+      border-color: #2f5a3a;
+      background: #16261b;
+    }
+
+    .icon-btn.play.active {
+      color: #e66;
+      border-color: #5a2828;
+      background: #2b1a1a;
+    }
+
+    .icon-btn.regen {
+      color: #e6b800;
+      border-color: #4a4018;
+    }
+
+    .icon-btn.regen.hot {
+      color: #ffcf3a;
+      border-color: #6a5a1a;
+      background: #2b2408;
+    }
+
+    .icon-btn.regen:hover:not(:disabled) {
+      background: #2b2408;
+    }
+
+    .icon-btn.del:hover:not(:disabled) {
+      color: #e66;
+      border-color: #5a2828;
+      background: #2b1a1a;
+    }
+
+    .empty {
+      padding: 80px 20px;
+      text-align: center;
+      color: #3a4048;
+      font-size: 12px;
+    }
+
+    .empty b {
+      color: #586069;
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .row-badge {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font: 9px monospace;
+      letter-spacing: .5px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      pointer-events: none;
+      display: none;
+    }
+
+    .clip-row.queued .row-badge {
+      display: block;
+      color: #a8a862;
+      background: rgba(168, 168, 98, .12);
+    }
+
+    .clip-row.generating .row-badge {
+      display: block;
+      color: #e6b800;
+      background: rgba(230, 184, 0, .15);
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="logo">🎙</span>
+      <span class="title">Qwen3-TTS</span>
+      <span class="subtitle">角色台词编辑器</span>
+    </div>
+    <div class="spacer"></div>
+    <span class="queue-indicator" id="queueIndicator"></span>
+    <button class="tool-btn primary" id="playBtn" disabled>▶ 播放全部</button>
+    <button class="tool-btn" id="stopBtn" disabled>■ 停止</button>
+    <button class="tool-btn danger" id="clearBtn" disabled>清空</button>
+  </header>
+
+  <div class="layout">
+
+    <!-- ============ 侧栏 ============ -->
+    <aside>
+
+      <section class="card">
+        <h3>新建台词 <span class="badge" id="ptHint">加载中…</span></h3>
+        <div class="field">
+          <label>谁（角色）</label>
+          <select id="genRole"></select>
+        </div>
+        <div class="field">
+          <label>用什么感情</label>
+          <select id="genEmotion"></select>
+        </div>
+        <div class="field">
+          <label>语言</label>
+          <select id="genLanguage">
+            <option>Chinese</option>
+            <option>English</option>
+            <option>Japanese</option>
+            <option>Korean</option>
+            <option>Auto</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>说了什么话（Ctrl+Enter 入队）</label>
+          <textarea id="genText" placeholder="输入台词…"></textarea>
+        </div>
+        <button class="btn primary" id="genBtn">+ 加入生成队列</button>
+        <div class="gen-status" id="genStatus">就绪</div>
+      </section>
+
+      <section class="card">
+        <h3>新片段默认预设</h3>
+        <div class="grid-2">
+          <div class="field" style="margin-bottom:0">
+            <label>设备</label>
+            <select id="defSpeaker">
+              <option value="raw" selected>RAW 不处理</option>
+              <option value="clean">CLEAN 数字</option>
+              <option value="radio">RADIO 模拟</option>
+              <option value="dirty">DIRTY 老化</option>
+              <option value="broken">BROKEN 损坏</option>
+              <option value="destroyed">DESTROYED 炸麦</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>信号</label>
+            <select id="defSignal">
+              <option value="raw" selected>RAW 不处理</option>
+              <option value="strong">STRONG 强</option>
+              <option value="normal">NORMAL 正常</option>
+              <option value="weak">WEAK 弱</option>
+              <option value="critical">CRITICAL 极弱</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>批量套用</h3>
+        <div class="field"><button class="btn small" id="applySpeakerAll">⇉ 设备 套用到全部</button></div>
+        <div class="field"><button class="btn small" id="applySignalAll">⇉ 信号 套用到全部</button></div>
+        <div class="field" style="margin-bottom:0"><button class="btn small primary" id="applyBothAll">⇉ 设备 + 信号
+            都套用</button></div>
+      </section>
+
+      <section class="card">
+        <h3>角色图例</h3>
+        <div id="roleLegend" style="display:flex; flex-wrap:wrap; gap:6px; font-size:11px;"></div>
+      </section>
+
+      <section class="card">
+        <h3>统计</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; font-size:11px;">
+          <div style="color:#586069">台词数</div>
+          <div style="text-align:right;color:#8a949e" id="statClips">0</div>
+          <div style="color:#586069">队列中</div>
+          <div style="text-align:right;color:#e6b800" id="statQueue">0</div>
+          <div style="color:#586069">总时长</div>
+          <div style="text-align:right;color:#8a949e" id="statDuration">0.00s</div>
+          <div style="color:#586069">已生成</div>
+          <div style="text-align:right;color:#72e68a" id="statReady">0</div>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- ============ 列表 ============ -->
+    <main>
+      <div class="list-header">
+        <div></div>
+        <div class="hdr">#</div>
+        <div class="hdr left">谁</div>
+        <div class="hdr left">感情</div>
+        <div class="hdr left">说了什么</div>
+        <div class="hdr">设备</div>
+        <div class="hdr">信号</div>
+        <div class="hdr">延迟</div>
+        <div class="hdr">▶</div>
+        <div class="hdr">↻</div>
+        <div class="hdr">×</div>
+      </div>
+      <div class="list" id="list">
+        <div class="empty"><b>暂无台词</b>在左侧选择角色和感情，输入文本后「加入生成队列」</div>
+      </div>
+    </main>
+
+  </div>
+
+  <footer>
+    <span class="stat">状态 <b id="statusText">就绪</b></span>
+    <span class="sep">│</span>
+    <span class="stat">队列 <b id="footQueue">0</b></span>
+    <span class="sep">│</span>
+    <span class="stat">台词 <b id="footClips">0</b></span>
+    <span class="sep">│</span>
+    <span class="stat">已生成 <b id="footReady">0</b></span>
+  </footer>
+
+  <script>
+    // ============================================================
+    // 音效预设（完整保留）
+    // ============================================================
+    const SPEAKER_PRESETS = {
+      raw: {
+        highPassFreq: 20, lowPassFreq: 20000,
+        compressorThreshold: 0, compressorRatio: 1, compressorKnee: 0,
+        compressorAttack: 0.003, compressorRelease: 0.25,
+        distortionAmount: 0, voiceVolume: 1.0,
+        staticVolume: 0, staticFreq: 1000, staticQ: 0.7,
+        crackleRate: 0, crackleVolume: 0,
+        burstFreqLow: 1000, burstFreqHigh: 3000,
+        burstDuration: 0, burstPeak: 0,
+        burstRise: 0.001, burstFall: 0.001,
+        voiceStartRatio: 0, pttClickLevel: 0, pttClickHp: 3000
+      },
+      clean: {
+        highPassFreq: 200, lowPassFreq: 4500,
+        compressorThreshold: -25, compressorRatio: 8, compressorKnee: 15,
+        compressorAttack: 0.003, compressorRelease: 0.08,
+        distortionAmount: 2, voiceVolume: 0.8,
+        staticVolume: 0.002, staticFreq: 1600, staticQ: 0.6,
+        crackleRate: 0.3, crackleVolume: 0.015,
+        burstFreqLow: 800, burstFreqHigh: 3500,
+        burstDuration: 0.05, burstPeak: 0.08,
+        burstRise: 0.010, burstFall: 0.020,
+        voiceStartRatio: 0.82, pttClickLevel: 0.05, pttClickHp: 3000
+      },
+      radio: {
+        highPassFreq: 400, lowPassFreq: 2800,
+        compressorThreshold: -25, compressorRatio: 10, compressorKnee: 15,
+        compressorAttack: 0.003, compressorRelease: 0.08,
+        distortionAmount: 6, voiceVolume: 0.8,
+        staticVolume: 0.012, staticFreq: 1300, staticQ: 0.7,
+        crackleRate: 2.0, crackleVolume: 0.05,
+        burstFreqLow: 500, burstFreqHigh: 3200,
+        burstDuration: 0.09, burstPeak: 0.22,
+        burstRise: 0.015, burstFall: 0.030,
+        voiceStartRatio: 0.82, pttClickLevel: 0.10, pttClickHp: 2800
+      },
+      dirty: {
+        highPassFreq: 650, lowPassFreq: 2000,
+        compressorThreshold: -30, compressorRatio: 15, compressorKnee: 10,
+        compressorAttack: 0.001, compressorRelease: 0.05,
+        distortionAmount: 12, voiceVolume: 0.8,
+        staticVolume: 0.025, staticFreq: 1200, staticQ: 0.8,
+        crackleRate: 5.0, crackleVolume: 0.09,
+        burstFreqLow: 350, burstFreqHigh: 2800,
+        burstDuration: 0.14, burstPeak: 0.38,
+        burstRise: 0.022, burstFall: 0.040,
+        voiceStartRatio: 0.82, pttClickLevel: 0.16, pttClickHp: 2600
+      },
+      broken: {
+        highPassFreq: 800, lowPassFreq: 1500,
+        compressorThreshold: -32, compressorRatio: 20, compressorKnee: 5,
+        compressorAttack: 0.001, compressorRelease: 0.04,
+        distortionAmount: 20, voiceVolume: 0.85,
+        staticVolume: 0.05, staticFreq: 1100, staticQ: 0.9,
+        crackleRate: 12, crackleVolume: 0.15,
+        burstFreqLow: 250, burstFreqHigh: 2200,
+        burstDuration: 0.22, burstPeak: 0.60,
+        burstRise: 0.030, burstFall: 0.060,
+        voiceStartRatio: 0.82, pttClickLevel: 0.22, pttClickHp: 2400
+      },
+      destroyed: {
+        highPassFreq: 900, lowPassFreq: 1300,
+        compressorThreshold: -40, compressorRatio: 30, compressorKnee: 2,
+        compressorAttack: 0.0005, compressorRelease: 0.02,
+        distortionAmount: 60, voiceVolume: 1.0,
+        staticVolume: 0.12, staticFreq: 1000, staticQ: 1.2,
+        crackleRate: 25, crackleVolume: 0.25,
+        burstFreqLow: 200, burstFreqHigh: 1800,
+        burstDuration: 0.35, burstPeak: 0.90,
+        burstRise: 0.040, burstFall: 0.075,
+        voiceStartRatio: 0.85, pttClickLevel: 0.40, pttClickHp: 2000
+      }
+    };
+
+    const SIGNAL_PRESETS = {
+      raw: {
+        fadeDepth: 0, fadeRate: 0.5,
+        dropoutRate: 0, dropoutDuration: 0.05, dropoutNoiseBoost: 1,
+        hetVolume: 0, hetFreq: 1000,
+        sparkRate: 0, sparkVolume: 0,
+        squelchThreshold: 0, squelchHysteresis: 0,
+        squelchAttack: 0.005, squelchRelease: 0.05,
+        squelchFloor: 1, squelchNoiseOpen: 1, squelchNoiseClosed: 1,
+        agcPump: 0, driftRate: 0, driftDepth: 0
+      },
+      strong: {
+        fadeDepth: 0, fadeRate: 0.5,
+        dropoutRate: 0, dropoutDuration: 0.05, dropoutNoiseBoost: 1,
+        hetVolume: 0, hetFreq: 1000,
+        sparkRate: 0, sparkVolume: 0.05,
+        squelchThreshold: 0, squelchHysteresis: 10,
+        squelchAttack: 0.005, squelchRelease: 0.05,
+        squelchFloor: 1, squelchNoiseOpen: 1, squelchNoiseClosed: 1,
+        agcPump: 0, driftRate: 0, driftDepth: 0
+      },
+      normal: {
+        fadeDepth: 0.18, fadeRate: 0.8,
+        dropoutRate: 0.3, dropoutDuration: 0.05, dropoutNoiseBoost: 2.0,
+        hetVolume: 0, hetFreq: 1200,
+        sparkRate: 0.3, sparkVolume: 0.08,
+        squelchThreshold: 18, squelchHysteresis: 8,
+        squelchAttack: 0.008, squelchRelease: 0.08,
+        squelchFloor: 0.06, squelchNoiseOpen: 1, squelchNoiseClosed: 0.15,
+        agcPump: 0.15, driftRate: 0, driftDepth: 0
+      },
+      weak: {
+        fadeDepth: 0.45, fadeRate: 1.5,
+        dropoutRate: 1.2, dropoutDuration: 0.09, dropoutNoiseBoost: 3.2,
+        hetVolume: 0.015, hetFreq: 1600,
+        sparkRate: 1.5, sparkVolume: 0.15,
+        squelchThreshold: 26, squelchHysteresis: 10,
+        squelchAttack: 0.012, squelchRelease: 0.10,
+        squelchFloor: 0.10, squelchNoiseOpen: 1, squelchNoiseClosed: 0.25,
+        agcPump: 0.35, driftRate: 0.35, driftDepth: 0.004
+      },
+      critical: {
+        fadeDepth: 0.7, fadeRate: 2.5,
+        dropoutRate: 2.5, dropoutDuration: 0.14, dropoutNoiseBoost: 4.8,
+        hetVolume: 0.05, hetFreq: 900,
+        sparkRate: 5, sparkVolume: 0.25,
+        squelchThreshold: 34, squelchHysteresis: 14,
+        squelchAttack: 0.018, squelchRelease: 0.13,
+        squelchFloor: 0.14, squelchNoiseOpen: 1.05, squelchNoiseClosed: 0.35,
+        agcPump: 0.6, driftRate: 0.8, driftDepth: 0.010
+      }
+    };
+
+    function buildP(sp, sg) {
+      return Object.assign({}, SPEAKER_PRESETS[sp], { signal: SIGNAL_PRESETS[sg] });
+    }
+
+    // ============================================================
+    // 角色颜色
+    // ============================================================
+    // 预定义色相，避开绿色（播放）和黄色（排队）
+    const ROLE_HUES = [200, 280, 340, 25, 55, 220, 300, 245, 175, 15, 265, 320];
+    const roleColorCache = new Map();
+
+    function roleHue(role) {
+      if (roleColorCache.has(role)) return roleColorCache.get(role);
+      let h = 0;
+      for (let i = 0; i < role.length; i++) h = (h * 137 + role.charCodeAt(i)) >>> 0;
+      const hue = ROLE_HUES[h % ROLE_HUES.length];
+      roleColorCache.set(role, hue);
+      return hue;
+    }
+
+    function roleColorVars(role) {
+      const hue = roleHue(role);
+      return {
+        "--role-color": `hsl(${hue}, 65%, 60%)`,
+        "--role-fg": `hsl(${hue}, 75%, 72%)`,
+        "--role-bg": `hsla(${hue}, 60%, 30%, 0.35)`,
+        "--role-border": `hsla(${hue}, 60%, 55%, 0.5)`,
+      };
+    }
+
+    function applyRoleColorVars(el, role) {
+      const vars = roleColorVars(role);
+      for (const k in vars) el.style.setProperty(k, vars[k]);
+    }
+
+    // ============================================================
+    // 全局状态
+    // ============================================================
+    let ctx = null;
+    let P = buildP("raw", "raw");
+    let chain = null;
+    let source = null;
+    let isPlaying = false;
+
+    let noiseTimer = null, dropoutTimer = null, sparkTimer = null,
+      squelchTimer = null, endTimer = null;
+
+    const clips = [];
+    let clipIdCounter = 0;
+    let playlistRunning = false;
+    let activeStop = null;
+    let dragId = null;
+    let singlePlayingId = null;
+
+    // 角色数据
+    let rolesData = {};          // {角色: [情感, ...]}
+    let roleList = [];           // 有序的角色数组
+
+    // 队列
+    const jobQueue = [];
+    let activeJob = null;
+    let queueWorkerRunning = false;
+
+    // ============================================================
+    // DOM
+    // ============================================================
+    const $ = (id) => document.getElementById(id);
+
+    const listEl = $("list");
+    const playBtn = $("playBtn");
+    const stopBtn = $("stopBtn");
+    const clearBtn = $("clearBtn");
+    const queueIndicator = $("queueIndicator");
+
+    const genRole = $("genRole");
+    const genEmotion = $("genEmotion");
+    const genLanguage = $("genLanguage");
+    const genText = $("genText");
+    const genBtn = $("genBtn");
+    const genStatus = $("genStatus");
+    const ptHint = $("ptHint");
+
+    const defSpeaker = $("defSpeaker");
+    const defSignal = $("defSignal");
+    const applySpeakerAll = $("applySpeakerAll");
+    const applySignalAll = $("applySignalAll");
+    const applyBothAll = $("applyBothAll");
+
+    const statusText = $("statusText");
+    const footQueue = $("footQueue");
+    const footClips = $("footClips");
+    const footReady = $("footReady");
+    const statClips = $("statClips");
+    const statQueue = $("statQueue");
+    const statDuration = $("statDuration");
+    const statReady = $("statReady");
+    const roleLegend = $("roleLegend");
+
+    // ============================================================
+    // 工具
+    // ============================================================
+    function ensureCtx() {
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      return ctx;
+    }
+
+    function makeDistortionCurve(amount) {
+      const n = 8192;
+      const curve = new Float32Array(n);
+      if (amount <= 0.001) {
+        for (let i = 0; i < n; i++) curve[i] = (i * 2) / n - 1;
+        return curve;
+      }
+      for (let i = 0; i < n; i++) {
+        const x = (i * 2) / n - 1;
+        curve[i] = Math.tanh(x * amount);
+      }
+      return curve;
+    }
+
+    function createNoiseBuffer(c, duration) {
+      const length = Math.max(1, Math.floor(c.sampleRate * duration));
+      const buf = c.createBuffer(1, length, c.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+      return buf;
+    }
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    function setStatus(t) { statusText.textContent = t; }
+    function setGenStatus(t, cls = "") {
+      genStatus.textContent = t;
+      genStatus.className = "gen-status " + cls;
+    }
+
+    // ============================================================
+    // 音效（完整保留）
+    // ============================================================
+    function applyPreset(p, tc = 0.02) {
+      if (!chain || !ctx) return;
+      const t = ctx.currentTime;
+      const set = (param, value) => param.setTargetAtTime(value, t, tc);
+
+      set(chain.hp.frequency, p.highPassFreq);
+      set(chain.lp.frequency, p.lowPassFreq);
+      set(chain.comp.threshold, p.compressorThreshold);
+      set(chain.comp.ratio, p.compressorRatio);
+      set(chain.comp.knee, p.compressorKnee);
+      set(chain.comp.attack, p.compressorAttack);
+      set(chain.comp.release, p.compressorRelease);
+      set(chain.voice.gain, p.voiceVolume);
+      set(chain.nFilt.frequency, p.staticFreq);
+      set(chain.nFilt.Q, p.staticQ);
+      set(chain.nGain.gain, p.staticVolume);
+      chain.shaper.curve = makeDistortionCurve(p.distortionAmount);
+
+      if (chain.fadeLfo) set(chain.fadeLfo.frequency, p.signal.fadeRate);
+      if (chain.fadeDepthGain) set(chain.fadeDepthGain.gain, p.signal.fadeDepth / 2);
+      if (chain.voiceMod) set(chain.voiceMod.gain, 1 - p.signal.fadeDepth / 2);
+      if (chain.hetGain) set(chain.hetGain.gain, p.signal.hetVolume);
+      if (chain.hetOsc) set(chain.hetOsc.frequency, p.signal.hetFreq);
+      if (chain.agcPumpGain) set(chain.agcPumpGain.gain, 1 - p.signal.agcPump * 0.5);
+      if (chain.driftLfo) set(chain.driftLfo.frequency, Math.max(0.01, p.signal.driftRate));
+      if (chain.driftDetuneGain) set(chain.driftDetuneGain.gain, p.signal.driftDepth * 100);
+    }
+
+    function playSquelchBurst() {
+      if (!ctx) return;
+      if (P.burstPeak <= 0.0001 || P.burstDuration <= 0.001) return;
+      const c = ctx;
+      const t = c.currentTime + 0.005;
+      const dur = P.burstDuration, peak = P.burstPeak;
+      const rise = P.burstRise, fall = P.burstFall;
+      const hold = Math.max(0.005, dur - rise - fall);
+      const src = c.createBufferSource();
+      src.buffer = createNoiseBuffer(c, dur + 0.1);
+      const bp = c.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = (P.burstFreqLow + P.burstFreqHigh) / 2;
+      bp.Q.value = 0.5 + (P.burstFreqHigh - P.burstFreqLow) / 2000;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + rise);
+      g.gain.setValueAtTime(peak, t + rise + hold);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(bp).connect(g).connect(c.destination);
+      src.start(t); src.stop(t + dur + 0.05);
+    }
+
+    function playPttClick() {
+      if (!ctx) return;
+      const c = ctx;
+      const t = c.currentTime;
+      const level = P.pttClickLevel;
+      if (level <= 0) return;
+      const src = c.createBufferSource();
+      src.buffer = createNoiseBuffer(c, 0.02);
+      const hp = c.createBiquadFilter();
+      hp.type = "highpass"; hp.frequency.value = P.pttClickHp;
+      const g = c.createGain();
+      g.gain.setValueAtTime(level, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.012);
+      src.connect(hp).connect(g).connect(c.destination);
+      src.start(t); src.stop(t + 0.03);
+    }
+
+    function playCrackle() {
+      const c = ctx;
+      const t = c.currentTime;
+      const dest = c.destination;
+      const base = P.crackleVolume;
+      const r = Math.random();
+
+      if (r < 0.55) {
+        const dur = 0.004 + Math.random() * 0.012;
+        const amp = base * (0.5 + Math.random() * 1.6);
+        const src = c.createBufferSource();
+        src.buffer = createNoiseBuffer(c, dur);
+        const bp = c.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 1800 + Math.random() * 3500;
+        bp.Q.value = 2 + Math.random() * 8;
+        const g = c.createGain();
+        g.gain.setValueAtTime(amp, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(bp).connect(g).connect(dest);
+        src.start(t); src.stop(t + dur + 0.02);
+      } else if (r < 0.82) {
+        const dur = 0.018 + Math.random() * 0.035;
+        const amp = base * (0.4 + Math.random() * 0.9);
+        const src = c.createBufferSource();
+        src.buffer = createNoiseBuffer(c, dur);
+        const lp = c.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 200 + Math.random() * 350;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(amp, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(lp).connect(g).connect(dest);
+        src.start(t); src.stop(t + dur + 0.02);
+      } else {
+        const dur = 0.05 + Math.random() * 0.13;
+        const amp = base * (0.3 + Math.random() * 0.7);
+        const src = c.createBufferSource();
+        src.buffer = createNoiseBuffer(c, dur);
+        const bp = c.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 800 + Math.random() * 1400;
+        bp.Q.value = 0.6 + Math.random() * 0.9;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(amp, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(bp).connect(g).connect(dest);
+        src.start(t); src.stop(t + dur + 0.02);
+      }
+    }
+
+    function playSpark() {
+      const c = ctx;
+      const t = c.currentTime;
+      const amp = P.signal.sparkVolume;
+      if (amp <= 0) return;
+      const dur = 0.003 + Math.random() * 0.01;
+      const src = c.createBufferSource();
+      src.buffer = createNoiseBuffer(c, dur);
+      const bp = c.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 2000 + Math.random() * 3000;
+      bp.Q.value = 1 + Math.random() * 3;
+      const g = c.createGain();
+      g.gain.setValueAtTime(amp, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(bp).connect(g).connect(c.destination);
+      src.start(t); src.stop(t + dur + 0.02);
+    }
+
+    function triggerDropout() {
+      if (!ctx || !chain) return;
+      const c = ctx;
+      const t = c.currentTime;
+      const dur = P.signal.dropoutDuration;
+      const boost = Math.max(1, P.signal.dropoutNoiseBoost);
+      const vg = chain.voiceDropGain.gain;
+      const ng = chain.noiseDropGain.gain;
+      try {
+        vg.cancelScheduledValues(t);
+        vg.setValueAtTime(Math.max(0.02, vg.value), t);
+        vg.linearRampToValueAtTime(0.02, t + 0.008);
+        vg.setValueAtTime(0.02, t + dur - 0.025);
+        vg.linearRampToValueAtTime(1, t + dur);
+        ng.cancelScheduledValues(t);
+        ng.setValueAtTime(Math.max(1, ng.value), t);
+        ng.linearRampToValueAtTime(boost, t + 0.008);
+        ng.setValueAtTime(boost, t + dur - 0.025);
+        ng.linearRampToValueAtTime(1, t + dur);
+      } catch (e) { }
+    }
+
+    function startRandomNoise() {
+      stopRandomNoise();
+      const tick = () => {
+        if (!isPlaying || !chain) return;
+        const rate = Math.max(0.05, P.crackleRate);
+        const delay = (-Math.log(1 - Math.random()) / rate) * 1000;
+        noiseTimer = setTimeout(() => {
+          if (!isPlaying || !chain) return;
+          playCrackle(); tick();
+        }, delay);
+      };
+      tick();
+    }
+    function stopRandomNoise() { clearTimeout(noiseTimer); noiseTimer = null; }
+
+    function startSignalDegradation() {
+      stopSignalDegradation();
+      const tickDropout = () => {
+        if (!isPlaying || !chain) return;
+        const rate = P.signal.dropoutRate;
+        if (rate <= 0) { dropoutTimer = setTimeout(tickDropout, 500); return; }
+        const delay = (-Math.log(1 - Math.random()) / rate) * 1000;
+        dropoutTimer = setTimeout(() => {
+          if (!isPlaying || !chain) return;
+          triggerDropout(); tickDropout();
+        }, delay);
+      };
+      const tickSpark = () => {
+        if (!isPlaying || !chain) return;
+        const rate = P.signal.sparkRate;
+        if (rate <= 0) { sparkTimer = setTimeout(tickSpark, 500); return; }
+        const delay = (-Math.log(1 - Math.random()) / rate) * 1000;
+        sparkTimer = setTimeout(() => {
+          if (!isPlaying || !chain) return;
+          playSpark(); tickSpark();
+        }, delay);
+      };
+      tickDropout(); tickSpark();
+    }
+    function stopSignalDegradation() {
+      clearTimeout(dropoutTimer); clearTimeout(sparkTimer);
+      dropoutTimer = null; sparkTimer = null;
+    }
+
+    function startSquelchGate() {
+      stopSquelchGate();
+      if (!chain || !ctx) return;
+      if (P.signal.squelchThreshold <= 0) return;
+      const analyser = chain.analyser;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      let gateOpen = false;
+      const tick = () => {
+        if (!isPlaying || !chain || !analyser) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const energy = sum / dataArray.length;
+        const openThreshold = P.signal.squelchThreshold + P.signal.squelchHysteresis;
+        const closeThreshold = P.signal.squelchThreshold - P.signal.squelchHysteresis;
+        const c = ctx;
+        const t = c.currentTime;
+        const vg = chain.voiceDropGain.gain;
+        const ng = chain.noiseDropGain.gain;
+        if (!gateOpen && energy > openThreshold) {
+          gateOpen = true;
+          try {
+            vg.cancelScheduledValues(t);
+            vg.setTargetAtTime(1, t, P.signal.squelchAttack);
+            ng.cancelScheduledValues(t);
+            ng.setTargetAtTime(P.signal.squelchNoiseOpen, t, P.signal.squelchAttack);
+          } catch (e) { }
+        } else if (gateOpen && energy < closeThreshold) {
+          gateOpen = false;
+          try {
+            vg.cancelScheduledValues(t);
+            vg.setTargetAtTime(P.signal.squelchFloor, t, P.signal.squelchRelease);
+            ng.cancelScheduledValues(t);
+            ng.setTargetAtTime(P.signal.squelchNoiseClosed, t, P.signal.squelchRelease);
+          } catch (e) { }
+        }
+        squelchTimer = setTimeout(tick, 25);
+      };
+      tick();
+    }
+    function stopSquelchGate() { clearTimeout(squelchTimer); squelchTimer = null; }
+
+    // ============================================================
+    // 播放单条
+    // ============================================================
+    function playClipAsync(clip) {
+      return new Promise((resolve) => {
+        if (!clip || !clip.buffer) { resolve(); return; }
+        const c = ensureCtx();
+        if (c.state === "suspended") c.resume();
+        P = buildP(clip.speaker, clip.signal);
+
+        let resolved = false;
+        function finish() {
+          if (resolved) return;
+          resolved = true;
+          activeStop = null;
+          resolve();
+        }
+        activeStop = () => {
+          if (source) { source.onended = null; try { source.stop(); } catch (e) { } }
+          clearTimeout(endTimer);
+          isPlaying = false;
+          stopRandomNoise(); stopSignalDegradation(); stopSquelchGate();
+          killChain(); finish();
+        };
+
+        const t0 = c.currentTime + 0.02;
+        const src = c.createBufferSource();
+        src.buffer = clip.buffer;
+
+        const hp = c.createBiquadFilter(); hp.type = "highpass";
+        const lp = c.createBiquadFilter(); lp.type = "lowpass";
+        const comp = c.createDynamicsCompressor();
+        const shaper = c.createWaveShaper(); shaper.oversample = "2x";
+        const voice = c.createGain();
+
+        const voiceMod = c.createGain();
+        voiceMod.gain.value = 1 - P.signal.fadeDepth / 2;
+
+        const agcPumpGain = c.createGain();
+        agcPumpGain.gain.value = 1 - P.signal.agcPump * 0.5;
+
+        const voiceDropGain = c.createGain();
+        voiceDropGain.gain.value = 1;
+
+        const fadeLfo = c.createOscillator();
+        fadeLfo.type = "sine";
+        fadeLfo.frequency.value = P.signal.fadeRate;
+        const fadeDepthGain = c.createGain();
+        fadeDepthGain.gain.value = P.signal.fadeDepth / 2;
+        fadeLfo.connect(fadeDepthGain).connect(voiceMod.gain);
+
+        const driftLfo = c.createOscillator();
+        driftLfo.type = "sine";
+        driftLfo.frequency.value = Math.max(0.01, P.signal.driftRate);
+        const driftDetuneGain = c.createGain();
+        driftDetuneGain.gain.value = P.signal.driftDepth * 100;
+        driftLfo.connect(driftDetuneGain).connect(src.detune);
+
+        const hetOsc = c.createOscillator();
+        hetOsc.type = "sine";
+        hetOsc.frequency.value = P.signal.hetFreq;
+        const hetGain = c.createGain();
+        hetGain.gain.value = P.signal.hetVolume;
+        hetOsc.connect(hetGain).connect(c.destination);
+
+        src.connect(hp).connect(lp).connect(comp).connect(shaper).connect(voice);
+        voice.connect(voiceMod).connect(agcPumpGain).connect(voiceDropGain).connect(c.destination);
+
+        const analyser = c.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.3;
+        voiceDropGain.connect(analyser);
+
+        const nSrc = c.createBufferSource();
+        nSrc.buffer = createNoiseBuffer(c, 0.5);
+        nSrc.loop = true;
+
+        const nFilt = c.createBiquadFilter(); nFilt.type = "bandpass";
+        const nGain = c.createGain(); nGain.gain.value = 0;
+        const noiseDropGain = c.createGain(); noiseDropGain.gain.value = 1;
+
+        nSrc.connect(nFilt).connect(nGain).connect(noiseDropGain).connect(c.destination);
+
+        chain = {
+          src, hp, lp, comp, shaper, voice,
+          voiceMod, agcPumpGain, voiceDropGain,
+          fadeLfo, fadeDepthGain,
+          driftLfo, driftDetuneGain,
+          hetOsc, hetGain,
+          nSrc, nFilt, nGain, noiseDropGain,
+          analyser
+        };
+        applyPreset(P, 0.03);
+
+        nSrc.start(t0);
+        fadeLfo.start(t0);
+        driftLfo.start(t0);
+        hetOsc.start(t0);
+
+        playPttClick();
+        playSquelchBurst();
+
+        const voiceStart = t0 + P.burstDuration * P.voiceStartRatio;
+        src.start(voiceStart);
+
+        source = src;
+        isPlaying = true;
+        startRandomNoise(); startSignalDegradation(); startSquelchGate();
+
+        src.onended = () => {
+          if (source !== src) return;
+          source = null; isPlaying = false;
+          stopRandomNoise(); stopSignalDegradation(); stopSquelchGate();
+          if (chain) {
+            const t = c.currentTime;
+            try {
+              chain.nGain.gain.cancelScheduledValues(t);
+              chain.nGain.gain.setTargetAtTime(0.0001, t, 0.02);
+            } catch (e) { }
+          }
+          playSquelchBurst();
+          playPttClick();
+          endTimer = setTimeout(() => { killChain(); finish(); }, P.burstDuration * 1000 + 80);
+        };
+      });
+    }
+
+    function killChain() {
+      stopRandomNoise(); stopSignalDegradation(); stopSquelchGate();
+      if (!chain || !ctx) { chain = null; return; }
+      const t = ctx.currentTime;
+      try {
+        chain.nGain.gain.cancelScheduledValues(t);
+        chain.nGain.gain.setTargetAtTime(0.0001, t, 0.015);
+      } catch (e) { }
+      try { chain.nSrc.stop(t + 0.1); } catch (e) { }
+      try { chain.fadeLfo.stop(t + 0.05); } catch (e) { }
+      try { chain.driftLfo.stop(t + 0.05); } catch (e) { }
+      try { chain.hetOsc.stop(t + 0.05); } catch (e) { }
+      chain = null;
+    }
+
+    // ============================================================
+    // 队列
+    // ============================================================
+    function enqueueJob(job) {
+      jobQueue.push(job);
+      updateStats();
+      renderList();
+      processQueue();
+    }
+
+    function updateStats() {
+      const pending = jobQueue.length + (activeJob ? 1 : 0);
+      const ready = clips.filter(c => c.buffer && !c.generating).length;
+      const total = clips.reduce((s, c) => s + (c.buffer ? c.buffer.duration : 0), 0);
+
+      statClips.textContent = clips.length;
+      statQueue.textContent = pending;
+      statDuration.textContent = total.toFixed(2) + "s";
+      statReady.textContent = ready;
+
+      footQueue.textContent = pending;
+      footClips.textContent = clips.length;
+      footReady.textContent = ready;
+
+      if (pending > 0) {
+        queueIndicator.textContent = "⏳ 队列 " + pending;
+        queueIndicator.classList.add("on");
+      } else {
+        queueIndicator.classList.remove("on");
+      }
+
+      playBtn.disabled = playlistRunning || singlePlayingId !== null || ready === 0;
+      stopBtn.disabled = !playlistRunning && singlePlayingId === null;
+      clearBtn.disabled = playlistRunning || singlePlayingId !== null || clips.length === 0;
+    }
+
+    async function processQueue() {
+      if (queueWorkerRunning) return;
+      queueWorkerRunning = true;
+
+      while (jobQueue.length > 0) {
+        const job = jobQueue.shift();
+        activeJob = job;
+        updateStats();
+        renderList();
+
+        const clip = clips.find(c => c.id === job.clipId);
+        if (clip) {
+          clip.queued = false;
+          clip.generating = true;
+          renderList();
+        }
+
+        try {
+          await runJob(job);
+        } catch (e) {
+          console.error("[queue] job failed:", job, e);
+          const c2 = clips.find(c => c.id === job.clipId);
+          if (c2) { c2.generating = false; c2.queued = false; }
+          setStatus("错误：" + e.message);
+          renderList();
+        }
+
+        activeJob = null;
+        updateStats();
+        renderList();
+      }
+
+      queueWorkerRunning = false;
+      updateStats();
+    }
+
+    async function runJob(job) {
+      const clip = clips.find(c => c.id === job.clipId);
+      if (!clip) return;
+
+      setStatus(`生成中：${job.role}/${job.emotion}「${job.text.slice(0, 16)}」`);
+
+      const resp = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: job.role,
+          emotion: job.emotion,
+          text: job.text,
+          language: job.language,
+          mode: "url",
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || ("HTTP " + resp.status));
+      }
+      const data = await resp.json();
+
+      const audioResp = await fetch(data.url + "?t=" + Date.now());
+      if (!audioResp.ok) throw new Error("下载失败: " + audioResp.status);
+
+      const ab = await audioResp.arrayBuffer();
+      const decoded = await ensureCtx().decodeAudioData(ab);
+
+      const i = clips.findIndex(c => c.id === job.clipId);
+      if (i < 0) return;
+
+      clips[i].buffer = decoded;
+      clips[i].generatedRole = job.role;
+      clips[i].generatedEmotion = job.emotion;
+      clips[i].generatedText = job.text;
+      clips[i].generatedLanguage = job.language;
+      clips[i].generating = false;
+      clips[i].queued = false;
+
+      setStatus(`完成：${job.role}/${job.emotion}`);
+    }
+
+    // ============================================================
+    // 播放调度
+    // ============================================================
+    async function runPlaylist() {
+      if (playlistRunning) return;
+      const playable = clips.filter(c => c.buffer);
+      if (playable.length === 0) return;
+
+      if (singlePlayingId !== null && activeStop) {
+        activeStop(); activeStop = null; singlePlayingId = null;
+      }
+
+      playlistRunning = true;
+      updateStats();
+      renderList();
+
+      for (let i = 0; i < clips.length; i++) {
+        if (!playlistRunning) break;
+        const clip = clips[i];
+        if (!clip.buffer) continue;
+
+        singlePlayingId = clip.id;
+        renderList();
+
+        try { await playClipAsync(clip); } catch (e) { console.error(e); }
+        singlePlayingId = null;
+
+        if (!playlistRunning) break;
+
+        if (i < clips.length - 1 && clip.delay > 0) {
+          setStatus(`等待 ${clip.delay.toFixed(2)}s`);
+          await sleep(clip.delay * 1000);
+        }
+      }
+
+      playlistRunning = false;
+      singlePlayingId = null;
+      renderList();
+      updateStats();
+      setStatus("完成");
+    }
+
+    function stopPlaylist() {
+      if (!playlistRunning && singlePlayingId === null) return;
+      playlistRunning = false;
+      if (activeStop) { activeStop(); activeStop = null; }
+      singlePlayingId = null;
+      renderList();
+      updateStats();
+      setStatus("已停止");
+    }
+
+    async function playSingle(clip) {
+      if (singlePlayingId === clip.id) {
+        if (activeStop) { activeStop(); activeStop = null; }
+        singlePlayingId = null;
+        renderList(); updateStats();
+        setStatus("停止");
+        return;
+      }
+      if (playlistRunning) stopPlaylist();
+      if (singlePlayingId !== null && activeStop) {
+        activeStop(); activeStop = null;
+      }
+      if (!clip.buffer) return;
+
+      singlePlayingId = clip.id;
+      renderList(); updateStats();
+      setStatus(`播放 #${clip.id} ${clip.role}/${clip.emotion}`);
+
+      try { await playClipAsync(clip); } catch (e) { console.error(e); }
+
+      if (singlePlayingId === clip.id) {
+        singlePlayingId = null;
+        renderList(); updateStats();
+        setStatus("就绪");
+      }
+    }
+
+    // ============================================================
+    // 列表渲染
+    // ============================================================
+    function isDirty(clip) {
+      if (!clip.buffer) return false;
+      return clip.role !== clip.generatedRole
+        || clip.emotion !== clip.generatedEmotion
+        || clip.text !== clip.generatedText;
+    }
+
+    function renderList() {
+      if (clips.length === 0) {
+        listEl.innerHTML = '<div class="empty"><b>暂无台词</b>在左侧选择角色和感情，输入文本后「加入生成队列」</div>';
+        updateStats();
+        return;
+      }
+      listEl.innerHTML = "";
+      clips.forEach((clip, idx) => listEl.appendChild(buildRow(clip, idx)));
+      updateStats();
+    }
+
+    function buildRow(clip, idx) {
+      const row = document.createElement("div");
+      row.className = "clip-row";
+      row.dataset.id = clip.id;
+      applyRoleColorVars(row, clip.role);
+
+      if (clip.generating) row.classList.add("generating");
+      else if (clip.queued) row.classList.add("queued");
+      else if (clip.id === singlePlayingId) row.classList.add("playing");
+      if (isDirty(clip) && !clip.generating && !clip.queued) row.classList.add("dirty");
+
+      const busy = playlistRunning || singlePlayingId !== null;
+
+      // ---- grip ----
+      const grip = document.createElement("span");
+      grip.className = "grip";
+      grip.textContent = "⠿";
+      grip.title = busy ? "播放中不可拖动" : "拖动排序";
+      grip.draggable = !busy;
+      grip.setAttribute("aria-disabled", String(busy));
+      grip.addEventListener("dragstart", (e) => {
+        if (busy) { e.preventDefault(); return; }
+        dragId = clip.id;
+        row.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(clip.id));
+        try { e.dataTransfer.setDragImage(row, 20, 20); } catch (_) { }
+      });
+      grip.addEventListener("dragend", () => {
+        row.classList.remove("dragging");
+        document.querySelectorAll(".clip-row").forEach(el => el.classList.remove("drop-target"));
+        syncOrderFromDOM();
+        dragId = null;
+        renderList();
+      });
+
+      // ---- idx ----
+      const idxEl = document.createElement("span");
+      idxEl.className = "idx";
+      idxEl.textContent = (idx + 1).toString().padStart(2, "0");
+
+      // ---- 角色 ----
+      const roleEl = document.createElement("select");
+      roleEl.className = "cell-select role-select";
+      const allRoles = roleList.slice();
+      if (clip.role && !allRoles.includes(clip.role)) allRoles.push(clip.role);
+      if (allRoles.length === 0) {
+        const o = document.createElement("option");
+        o.value = ""; o.textContent = "(无角色)";
+        roleEl.appendChild(o);
+      } else {
+        allRoles.forEach(r => {
+          const o = document.createElement("option");
+          o.value = r; o.textContent = r;
+          if (r === clip.role) o.selected = true;
+          roleEl.appendChild(o);
+        });
+      }
+      roleEl.disabled = busy || clip.generating || clip.queued;
+      roleEl.addEventListener("change", () => {
+        clip.role = roleEl.value;
+        // 重建情感下拉
+        rebuildEmotionSelect(emoEl, clip.role, clip.emotion);
+        const emos = rolesData[clip.role] || [];
+        if (!emos.includes(clip.emotion) && emos.length > 0) {
+          clip.emotion = emos[0];
+          emoEl.value = clip.emotion;
+        }
+        applyRoleColorVars(row, clip.role);
+        refreshRowDirtyState(row, clip, textEl, regenIco);
+      });
+
+      // ---- 情感 ----
+      const emoEl = document.createElement("select");
+      emoEl.className = "cell-select emo-select";
+      rebuildEmotionSelect(emoEl, clip.role, clip.emotion);
+      emoEl.disabled = busy || clip.generating || clip.queued;
+      emoEl.addEventListener("change", () => {
+        clip.emotion = emoEl.value;
+        refreshRowDirtyState(row, clip, textEl, regenIco);
+      });
+
+      // ---- 文本 ----
+      const textEl = document.createElement("input");
+      textEl.type = "text";
+      textEl.className = "cell-input text-cell";
+      textEl.value = clip.text || "";
+      textEl.title = clip.text || "";
+      if (isDirty(clip)) textEl.classList.add("changed");
+      textEl.disabled = busy || clip.generating || clip.queued;
+      textEl.addEventListener("input", () => {
+        clip.text = textEl.value;
+        refreshRowDirtyState(row, clip, textEl, regenIco);
+      });
+
+      // ---- 设备 ----
+      const spEl = document.createElement("select");
+      spEl.className = "cell-select";
+      for (const k of Object.keys(SPEAKER_PRESETS)) {
+        const o = document.createElement("option");
+        o.value = k; o.textContent = k.toUpperCase();
+        if (k === clip.speaker) o.selected = true;
+        spEl.appendChild(o);
+      }
+      spEl.disabled = busy;
+      spEl.addEventListener("change", () => { clip.speaker = spEl.value; });
+
+      // ---- 信号 ----
+      const sgEl = document.createElement("select");
+      sgEl.className = "cell-select";
+      for (const k of Object.keys(SIGNAL_PRESETS)) {
+        const o = document.createElement("option");
+        o.value = k; o.textContent = k.toUpperCase();
+        if (k === clip.signal) o.selected = true;
+        sgEl.appendChild(o);
+      }
+      sgEl.disabled = busy;
+      sgEl.addEventListener("change", () => { clip.signal = sgEl.value; });
+
+      // ---- 延迟 ----
+      const dWrap = document.createElement("div");
+      dWrap.className = "delay-wrap";
+      const dEl = document.createElement("input");
+      dEl.type = "number";
+      dEl.className = "cell-input";
+      dEl.min = "0"; dEl.step = "0.1";
+      dEl.value = clip.delay;
+      dEl.disabled = busy;
+      dEl.addEventListener("input", () => { clip.delay = Math.max(0, parseFloat(dEl.value) || 0); });
+      dEl.addEventListener("blur", () => { dEl.value = clip.delay; });
+      dWrap.appendChild(dEl);
+
+      // ---- ▶ ----
+      const playIco = document.createElement("button");
+      const isThis = clip.id === singlePlayingId;
+      playIco.className = "icon-btn play" + (isThis ? " active" : "");
+      playIco.textContent = isThis ? "■" : "▶";
+      playIco.title = isThis ? "停止" : "播放此条";
+      playIco.disabled = !clip.buffer || playlistRunning;
+      playIco.addEventListener("click", () => playSingle(clip));
+
+      // ---- ↻ ----
+      const regenIco = document.createElement("button");
+      regenIco.className = "icon-btn regen" + (isDirty(clip) ? " hot" : "");
+      regenIco.textContent = "↻";
+      regenIco.title = isDirty(clip) ? "应用修改并重新生成" : "重新生成";
+      regenIco.disabled = busy || clip.generating || clip.queued;
+      regenIco.addEventListener("click", () => {
+        const t = (clip.text || "").trim();
+        if (!t) { setStatus("文本不能为空"); return; }
+        if (!clip.role) { setStatus("未选择角色"); return; }
+        if (!clip.emotion) { setStatus("未选择情感"); return; }
+        clip.queued = true;
+        renderList();
+        enqueueJob({
+          clipId: clip.id,
+          role: clip.role,
+          emotion: clip.emotion,
+          text: t,
+          language: clip.language,
+        });
+        setStatus("已加入队列");
+      });
+
+      // ---- × ----
+      const delIco = document.createElement("button");
+      delIco.className = "icon-btn del";
+      delIco.textContent = "×";
+      delIco.title = "删除";
+      delIco.disabled = busy;
+      delIco.addEventListener("click", () => removeClip(clip.id));
+
+      // ---- 角标 ----
+      const badge = document.createElement("span");
+      badge.className = "row-badge";
+      if (clip.generating) badge.textContent = "生成中";
+      else if (clip.queued) {
+        const pos = jobQueue.findIndex(j => j.clipId === clip.id);
+        badge.textContent = pos >= 0 ? "排队 #" + (pos + 1) : "排队";
+      }
+
+      row.appendChild(grip);
+      row.appendChild(idxEl);
+      row.appendChild(roleEl);
+      row.appendChild(emoEl);
+      row.appendChild(textEl);
+      row.appendChild(spEl);
+      row.appendChild(sgEl);
+      row.appendChild(dWrap);
+      row.appendChild(playIco);
+      row.appendChild(regenIco);
+      row.appendChild(delIco);
+      row.appendChild(badge);
+
+      return row;
+    }
+
+    function refreshRowDirtyState(row, clip, textEl, regenIco) {
+      const d = isDirty(clip);
+      textEl.classList.toggle("changed", d);
+      row.classList.toggle("dirty", d && !clip.generating && !clip.queued);
+      regenIco.classList.toggle("hot", d);
+    }
+
+    function rebuildEmotionSelect(selectEl, role, selected) {
+      const emos = (rolesData[role] || []).slice();
+      if (selected && !emos.includes(selected)) emos.push(selected);
+      if (emos.length === 0) emos.push(selected || "(无)");
+
+      selectEl.innerHTML = "";
+      emos.forEach(e => {
+        const o = document.createElement("option");
+        o.value = e; o.textContent = e;
+        if (e === selected) o.selected = true;
+        selectEl.appendChild(o);
+      });
+    }
+
+    // ============================================================
+    // 拖拽排序
+    // ============================================================
+    listEl.addEventListener("dragover", (e) => {
+      if (!dragId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const targetRow = e.target.closest(".clip-row");
+      if (!targetRow) return;
+      const draggingEl = listEl.querySelector(".clip-row.dragging");
+      if (!draggingEl || draggingEl === targetRow) return;
+      const rect = targetRow.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (e.clientY < mid) listEl.insertBefore(draggingEl, targetRow);
+      else listEl.insertBefore(draggingEl, targetRow.nextSibling);
+      document.querySelectorAll(".clip-row").forEach(el => el.classList.remove("drop-target"));
+      targetRow.classList.add("drop-target");
+    });
+    listEl.addEventListener("drop", (e) => { if (dragId) e.preventDefault(); });
+
+    function syncOrderFromDOM() {
+      const ids = Array.from(listEl.querySelectorAll(".clip-row")).map(el => parseInt(el.dataset.id, 10));
+      const sorted = [];
+      for (const id of ids) {
+        const c = clips.find(x => x.id === id);
+        if (c) sorted.push(c);
+      }
+      clips.length = 0;
+      clips.push(...sorted);
+    }
+
+    // ============================================================
+    // 增删
+    // ============================================================
+    function removeClip(id) {
+      const busy = playlistRunning || singlePlayingId !== null;
+      if (busy) return;
+      if (singlePlayingId === id && activeStop) { activeStop(); activeStop = null; singlePlayingId = null; }
+      const i = clips.findIndex(c => c.id === id);
+      if (i >= 0) clips.splice(i, 1);
+      const qi = jobQueue.findIndex(j => j.clipId === id);
+      if (qi >= 0) jobQueue.splice(qi, 1);
+      renderList();
+      setStatus("已删除");
+    }
+
+    function clearAll() {
+      const busy = playlistRunning || singlePlayingId !== null;
+      if (busy) return;
+      clips.length = 0;
+      jobQueue.length = 0;
+      renderList();
+      setStatus("已清空");
+    }
+
+    // ============================================================
+    // 批量套用
+    // ============================================================
+    function applySpeakerToAll() {
+      const sp = defSpeaker.value;
+      clips.forEach(c => { c.speaker = sp; });
+      renderList();
+      setStatus(`设备 ${sp.toUpperCase()} 已套用到 ${clips.length} 段`);
+    }
+    function applySignalToAll() {
+      const sg = defSignal.value;
+      clips.forEach(c => { c.signal = sg; });
+      renderList();
+      setStatus(`信号 ${sg.toUpperCase()} 已套用到 ${clips.length} 段`);
+    }
+    function applyBothToAll() {
+      const sp = defSpeaker.value, sg = defSignal.value;
+      clips.forEach(c => { c.speaker = sp; c.signal = sg; });
+      renderList();
+      setStatus(`已套用 ${sp.toUpperCase()} + ${sg.toUpperCase()} 到 ${clips.length} 段`);
+    }
+
+    // ============================================================
+    // 加载 pt 列表
+    // ============================================================
+    async function loadPTList() {
+      ptHint.textContent = "加载中…";
+      try {
+        const r = await fetch("/api/pt/list");
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const data = await r.json();
+        rolesData = data.roles || {};
+        roleList = Object.keys(rolesData);
+        ptHint.textContent = `${roleList.length} 个角色 · ${data.count} 个音色`;
+        refreshGeneratorRoles();
+        renderLegend();
+      } catch (e) {
+        ptHint.textContent = "加载失败";
+        rolesData = {};
+        roleList = [];
+        refreshGeneratorRoles();
+        renderLegend();
+      }
+    }
+
+    function refreshGeneratorRoles() {
+      genRole.innerHTML = "";
+      if (roleList.length === 0) {
+        const o = document.createElement("option");
+        o.value = ""; o.textContent = "(pt/ 下无角色)";
+        genRole.appendChild(o);
+        genEmotion.innerHTML = "";
+        const o2 = document.createElement("option");
+        o2.value = ""; o2.textContent = "(无)";
+        genEmotion.appendChild(o2);
+        genBtn.disabled = true;
+        return;
+      }
+      genBtn.disabled = false;
+      roleList.forEach(r => {
+        const o = document.createElement("option");
+        o.value = r; o.textContent = r;
+        genRole.appendChild(o);
+      });
+      onGeneratorRoleChange();
+    }
+
+    function onGeneratorRoleChange() {
+      const role = genRole.value;
+      const emos = rolesData[role] || [];
+      genEmotion.innerHTML = "";
+      if (emos.length === 0) {
+        const o = document.createElement("option");
+        o.value = ""; o.textContent = "(无情感)";
+        genEmotion.appendChild(o);
+      } else {
+        emos.forEach(e => {
+          const o = document.createElement("option");
+          o.value = e; o.textContent = e;
+          genEmotion.appendChild(o);
+        });
+      }
+      // 给生成器的角色下拉也着色
+      applyRoleColorVars(genRole, role);
+      applyRoleColorVars(genEmotion, role);
+    }
+
+    function renderLegend() {
+      roleLegend.innerHTML = "";
+      if (roleList.length === 0) {
+        roleLegend.textContent = "（无）";
+        roleLegend.style.color = "#3a4048";
+        return;
+      }
+      roleList.forEach(r => {
+        const span = document.createElement("span");
+        const hue = roleHue(r);
+        span.style.cssText = `
+      display:inline-block; padding:2px 8px; border-radius:3px;
+      font-size:11px;
+      background: hsla(${hue},60%,30%,0.35);
+      color: hsl(${hue},75%,72%);
+      border: 1px solid hsla(${hue},60%,55%,0.5);
+    `;
+        span.textContent = r + " (" + (rolesData[r] || []).length + ")";
+        roleLegend.appendChild(span);
+      });
+    }
+
+    // ============================================================
+    // 新建台词
+    // ============================================================
+    function generateClip() {
+      const role = genRole.value;
+      const emotion = genEmotion.value;
+      const text = genText.value.trim();
+      const language = genLanguage.value;
+
+      if (!role) { setGenStatus("请先选择角色", "err"); return; }
+      if (!emotion) { setGenStatus("请先选择情感", "err"); return; }
+      if (!text) { setGenStatus("请输入文本", "err"); return; }
+
+      const clipId = ++clipIdCounter;
+      clips.push({
+        id: clipId,
+        role, emotion, text, language,
+        speaker: defSpeaker.value,
+        signal: defSignal.value,
+        delay: 0,
+        buffer: null,
+        queued: true,
+        generating: false,
+        generatedRole: null,
+        generatedEmotion: null,
+        generatedText: null,
+        generatedLanguage: null,
+      });
+      genText.value = "";
+      renderList();
+
+      enqueueJob({ clipId, role, emotion, text, language });
+      setGenStatus("✓ 已加入队列", "ok");
+    }
+
+    // ============================================================
+    // 事件
+    // ============================================================
+    playBtn.addEventListener("click", runPlaylist);
+    stopBtn.addEventListener("click", stopPlaylist);
+    clearBtn.addEventListener("click", clearAll);
+    genBtn.addEventListener("click", generateClip);
+    genRole.addEventListener("change", onGeneratorRoleChange);
+
+    applySpeakerAll.addEventListener("click", applySpeakerToAll);
+    applySignalAll.addEventListener("click", applySignalToAll);
+    applyBothAll.addEventListener("click", applyBothToAll);
+
+    genText.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        generateClip();
+      }
+    });
+
+    // ============================================================
+    // 启动
+    // ============================================================
+    renderList();
+    loadPTList();
+    setStatus("就绪");
+  </script>
+
+  <a href="/maker" target="_blank" rel="noopener" style="
+     position: fixed;
+     top: 7px; left: 50%;
+     transform: translateX(-50%);
+     z-index: 9999;
+     padding: 9px 18px;
+     font: 12px/1 -apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+     color: #72e68a;
+     background: #111316;
+     border: 1px solid #3a6b45;
+     border-radius: 8px;
+     text-decoration: none;
+     box-shadow: 0 4px 16px #0008;
+     transition: background .15s,color .15s,box-shadow .15s;
+     white-space: nowrap;
+   "
+    onmouseover="this.style.background='#16201a';this.style.color='#8aeea0';this.style.boxShadow='0 4px 20px #72e68a33';"
+    onmouseout="this.style.background='#111316';this.style.color='#72e68a';this.style.boxShadow='0 4px 16px #0008';">
+    🎙️ 音色打包器 ↗
+  </a>
+</body>
+
+</html>

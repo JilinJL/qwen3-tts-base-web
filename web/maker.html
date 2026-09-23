@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音色打包器 · TTS API</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            padding: 40px 16px 80px;
+            font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+            color: #ddd;
+            background: radial-gradient(circle at 50% 15%, #2a2d32 0, #17191c 45%, #08090a 100%);
+        }
+
+        .app {
+            max-width: 720px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .header h1 {
+            margin: 0 0 6px;
+            font-size: 18px;
+            color: #eee;
+            letter-spacing: 0.5px;
+        }
+
+        .header p {
+            margin: 0;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.7;
+        }
+
+        .header a {
+            color: #72e68a;
+            text-decoration: none;
+            border-bottom: 1px dashed #3a6b45;
+        }
+
+        .header a:hover {
+            color: #8aeea0;
+        }
+
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+
+        .nav-link {
+            flex-shrink: 0;
+            padding: 5px 11px;
+            font-size: 11px;
+            color: #72e68a;
+            background: #16201a;
+            border: 1px solid #3a6b45;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: background .15s, color .15s;
+            white-space: nowrap;
+        }
+
+        .nav-link:hover {
+            background: #1f2f24;
+            color: #8aeea0;
+        }
+
+        .card {
+            background: #111316;
+            border: 1px solid #2a2d31;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 10px 30px #0008;
+        }
+
+        .card h2 {
+            margin: 0 0 12px;
+            font-size: 11px;
+            color: #72e68a;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .hint {
+            font-size: 11px;
+            color: #666;
+            line-height: 1.6;
+            margin: 4px 0 0;
+        }
+
+        .hint.warn {
+            color: #c88a3a;
+        }
+
+        .hint code {
+            color: #72e68a;
+            background: #16201a;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+
+        /* ---------- 拖放区 ---------- */
+        .drop {
+            border: 2px dashed #333;
+            border-radius: 10px;
+            padding: 26px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        .drop:hover,
+        .drop.hover {
+            border-color: #72e68a;
+            background: #0f1a12;
+        }
+
+        .drop input[type="file"] {
+            display: none;
+        }
+
+        .drop-icon {
+            font-size: 26px;
+            color: #444;
+            margin-bottom: 6px;
+        }
+
+        .drop.hover .drop-icon {
+            color: #72e68a;
+        }
+
+        .drop-text {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .drop-sub {
+            font-size: 10px;
+            color: #555;
+            margin-top: 4px;
+        }
+
+        /* ---------- 波形编辑区 ---------- */
+        .wave-box {
+            display: none;
+            margin-top: 12px;
+            padding: 12px;
+            background: #0a0c0e;
+            border: 1px solid #1d2023;
+            border-radius: 10px;
+        }
+
+        .wave-box.show {
+            display: block;
+        }
+
+        .wave-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+
+        .wave-head .name {
+            flex: 1;
+            min-width: 0;
+            font-size: 12px;
+            color: #aaa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .wave-head .duration {
+            font: 10px monospace;
+            color: #666;
+            flex-shrink: 0;
+        }
+
+        .wave-head .clear {
+            padding: 4px 10px;
+            font-size: 11px;
+            color: #888;
+            background: transparent;
+            border: 1px solid #333;
+            border-radius: 5px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .wave-head .clear:hover {
+            color: #e66;
+            border-color: #5a2828;
+        }
+
+        /* ---------- 模式徽章 ---------- */
+        .mode-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            margin-bottom: 10px;
+            font: 10px monospace;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .mode-badge.editing {
+            color: #c88a3a;
+            background: #2a2015;
+            border: 1px solid #5a4a28;
+        }
+
+        .mode-badge.locked {
+            color: #72e68a;
+            background: #16201a;
+            border: 1px solid #3a6b45;
+        }
+
+        .wave-canvas-wrap {
+            position: relative;
+            background: #060709;
+            border: 1px solid #1d2023;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        canvas#wave {
+            display: block;
+            width: 100%;
+            height: 96px;
+            touch-action: none;
+            user-select: none;
+        }
+
+        canvas#wave.editing {
+            cursor: crosshair;
+        }
+
+        canvas#wave.locked {
+            cursor: default;
+        }
+
+        .time-ruler {
+            display: flex;
+            justify-content: space-between;
+            font: 9px monospace;
+            color: #444;
+            padding: 4px 2px 0;
+        }
+
+        .sel-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .sel-info {
+            font: 11px monospace;
+            color: #8aeea0;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .sel-info .dim {
+            color: #666;
+        }
+
+        .sel-info .warn {
+            color: #c88a3a;
+        }
+
+        .sel-btns {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .sel-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            font-family: inherit;
+            color: #bbb;
+            background: #181a1c;
+            border: 1px solid #45484b;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background .1s, color .1s, border-color .1s;
+            white-space: nowrap;
+        }
+
+        .sel-btn:hover:not(:disabled) {
+            background: #222528;
+            color: #eee;
+            border-color: #5a5e62;
+        }
+
+        .sel-btn:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        .sel-btn.playing {
+            color: #72e68a;
+            border-color: #3a6b45;
+            background: #0f1a12;
+        }
+
+        .sel-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .sel-btn.confirm {
+            color: #72e68a;
+            border-color: #3a6b45;
+        }
+
+        .sel-btn.confirm:hover:not(:disabled) {
+            background: #16201a;
+        }
+
+        .sel-btn.edit {
+            color: #c88a3a;
+            border-color: #5a4a28;
+        }
+
+        .sel-btn.edit:hover:not(:disabled) {
+            background: #2a2015;
+        }
+
+        /* ---------- 精调输入 ---------- */
+        .precise {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 8px;
+            align-items: center;
+        }
+
+        .precise label {
+            display: block;
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .precise input {
+            width: 100%;
+            padding: 5px 8px;
+            font: 11px monospace;
+            color: #ddd;
+            background: #181a1c;
+            border: 1px solid #333;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        .precise input:focus {
+            border-color: #72e68a;
+        }
+
+        .precise input:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* ---------- 表单 ---------- */
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        label.field {
+            display: block;
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 5px;
+            letter-spacing: 0.3px;
+        }
+
+        label.field .req {
+            color: #e66;
+        }
+
+        label.field .opt {
+            color: #555;
+            font-size: 10px;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 9px 11px;
+            font-size: 13px;
+            font-family: inherit;
+            color: #ddd;
+            background: #181a1c;
+            border: 1px solid #333;
+            border-radius: 7px;
+            outline: none;
+            transition: border-color .15s;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            border-color: #72e68a;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 70px;
+            line-height: 1.6;
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: #444;
+        }
+
+        .check {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 11px;
+            color: #888;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .check input {
+            accent-color: #72e68a;
+        }
+
+        .submit {
+            width: 100%;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #0b1f0f;
+            background: #72e68a;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 8px 24px #72e68a33;
+            transition: background .15s, transform .1s;
+        }
+
+        .submit:hover:not(:disabled) {
+            background: #8aeea0;
+        }
+
+        .submit:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        .submit:disabled {
+            background: #1f2a22;
+            color: #3d5544;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .status {
+            display: none;
+            padding: 12px 14px;
+            font: 11px/1.7 monospace;
+            background: #0a0c0e;
+            border: 1px solid #1d2023;
+            border-radius: 8px;
+            color: #aaa;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.ok {
+            border-color: #2a4a35;
+            color: #8aeea0;
+        }
+
+        .status.err {
+            border-color: #5a2828;
+            color: #e88;
+        }
+
+        .lib {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .lib-item {
+            font: 11px monospace;
+            padding: 4px 9px;
+            background: #181a1c;
+            border: 1px solid #2a2d31;
+            border-radius: 6px;
+            color: #999;
+            cursor: pointer;
+            transition: border-color .15s, color .15s;
+        }
+
+        .lib-item:hover {
+            border-color: #72e68a;
+            color: #72e68a;
+        }
+
+        .lib-empty {
+            font-size: 11px;
+            color: #555;
+            font-style: italic;
+        }
+
+        @media (max-width: 520px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+
+        <header class="header">
+            <div class="header-top">
+                <h1>🎙️ 音色打包器</h1>
+                <a class="nav-link" href="/" target="_blank" rel="noopener">📢 语音合成 ↗</a>
+            </div>
+            <p>
+                上传参考音频 → <b>裁切并确认</b> → 填写文本 → 打包成 <code>.pt</code>，存到
+                <code>pt/{角色}/{角色}_{情感}.pt</code>。
+                生成的音色可立即通过 <a href="/docs">API</a> 或 <a href="/">测试页</a> 使用。
+            </p>
+        </header>
+
+        <!-- ============ 01 · 参考音频 ============ -->
+        <section class="card">
+            <h2>01 · 参考音频</h2>
+
+            <div class="drop" id="drop">
+                <input type="file" id="file" accept="audio/*">
+                <div class="drop-icon">♫</div>
+                <div class="drop-text">拖放音频到此处，或点击选择</div>
+                <div class="drop-sub">wav / mp3 / flac / m4a / ogg · 建议 3~10 秒、单人、无背景音</div>
+            </div>
+
+            <div class="wave-box" id="waveBox">
+                <div class="wave-head">
+                    <span class="name" id="fileName">—</span>
+                    <span class="duration" id="fileDuration">—</span>
+                    <button class="clear" id="clearFile">更换</button>
+                </div>
+
+                <div class="mode-badge editing" id="modeBadge">编辑中 · 拖动选区</div>
+
+                <div class="wave-canvas-wrap">
+                    <canvas id="wave" class="editing"></canvas>
+                </div>
+                <div class="time-ruler">
+                    <span id="rulerL">0:00.00</span>
+                    <span id="rulerM"></span>
+                    <span id="rulerR">0:00.00</span>
+                </div>
+
+                <div class="sel-bar">
+                    <div class="sel-info" id="selInfo">选区：—</div>
+                    <div class="sel-btns">
+                        <button class="sel-btn" id="previewBtn" disabled>▶ 试听</button>
+                        <button class="sel-btn" id="resetBtn" disabled>用全段</button>
+                        <button class="sel-btn confirm" id="confirmBtn" disabled>✅ 确认裁切</button>
+                        <button class="sel-btn edit" id="editBtn" style="display:none;">↩ 重新裁切</button>
+                    </div>
+                </div>
+
+                <div class="precise" id="preciseBox">
+                    <div>
+                        <label>起始 (s)</label>
+                        <input type="number" id="startIn" min="0" step="0.01">
+                    </div>
+                    <div>
+                        <label>结束 (s)</label>
+                        <input type="number" id="endIn" min="0" step="0.01">
+                    </div>
+                </div>
+
+                <p class="hint" id="waveHint">
+                    拖动绿色手柄调整选区，拖选区内部整体平移，点击空白处开始新选区。
+                </p>
+            </div>
+        </section>
+
+        <!-- ============ 02 · 音色信息 ============ -->
+        <section class="card">
+            <h2>02 · 音色信息</h2>
+            <div class="row">
+                <div>
+                    <label class="field">角色名 <span class="req">*</span></label>
+                    <input type="text" id="role" placeholder="例如：张三" maxlength="30">
+                </div>
+                <div>
+                    <label class="field">情感名 <span class="req">*</span></label>
+                    <input type="text" id="emotion" placeholder="例如：平静 / 愤怒" maxlength="30">
+                </div>
+            </div>
+            <label class="field">
+                参考音频文本 <span class="opt">（留空则用 x-vector only 模式）</span>
+            </label>
+            <textarea id="refText"
+                placeholder="必须与音频内容一字不差，否则音色会偏。&#10;若留空，会用 x-vector only 模式：不需要文本，但音色还原度会下降。"></textarea>
+            <p class="hint warn" id="xvecHint" style="display:none;">
+                ⚠️ 未填参考文本 → 将使用 <code>x_vector_only_mode</code>，音色会明显偏离原声。
+            </p>
+            <label class="check">
+                <input type="checkbox" id="overwrite">
+                覆盖已存在的同名 .pt 文件
+            </label>
+        </section>
+
+        <button class="submit" id="submit" disabled>生成 .pt 文件</button>
+
+        <div class="status" id="status"></div>
+
+        <!-- ============ 音色库 ============ -->
+        <section class="card">
+            <h2>音色库 · 已存在</h2>
+            <div class="lib" id="lib"><span class="lib-empty">加载中…</span></div>
+            <p class="hint">点击任意标签可快速填入角色/情感。生成后本列表会自动刷新。</p>
+        </section>
+
+    </div>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        const drop = $("drop"), fileInput = $("file");
+        const waveBox = $("waveBox"), canvas = $("wave");
+        const fileNameEl = $("fileName"), fileDurationEl = $("fileDuration");
+        const clearBtn = $("clearFile");
+        const previewBtn = $("previewBtn"), resetBtn = $("resetBtn");
+        const confirmBtn = $("confirmBtn"), editBtn = $("editBtn");
+        const selInfoEl = $("selInfo");
+        const startIn = $("startIn"), endIn = $("endIn");
+        const rulerL = $("rulerL"), rulerM = $("rulerM"), rulerR = $("rulerR");
+        const roleInput = $("role"), emotionInput = $("emotion"), refTextInput = $("refText");
+        const overwriteInput = $("overwrite");
+        const submitBtn = $("submit"), statusEl = $("status");
+        const xvecHint = $("xvecHint"), libEl = $("lib");
+        const modeBadge = $("modeBadge"), waveHint = $("waveHint");
+        const preciseBox = $("preciseBox");
+
+        // ============================================================
+        // 状态
+        // ============================================================
+
+        let audioCtx = null;
+        let audioBuffer = null;
+        let audioName = "";
+
+        // 选区（始终针对整段音频的秒数）
+        let selection = { start: 0, end: 0 };
+
+        // 是否已确认裁切
+        let cropLocked = false;
+
+        // 波形视图范围（未锁定时 = 全段；锁定时 = 选区）
+        let viewStart = 0, viewEnd = 0;
+
+        let dragState = null;
+
+        // 试听
+        let previewSource = null;
+        let previewStartCtxTime = 0;
+        let previewOffset = 0;
+        let previewRaf = null;
+        let isPreviewing = false;
+
+        function getCtx() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return audioCtx;
+        }
+
+        // ============================================================
+        // 时间/大小格式化
+        // ============================================================
+
+        function fmtTime(sec) {
+            if (!isFinite(sec)) return "0:00.00";
+            const m = Math.floor(sec / 60);
+            const s = sec - m * 60;
+            return m + ":" + (s < 10 ? "0" : "") + s.toFixed(2);
+        }
+
+        function fmtSize(bytes) {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+            return (bytes / 1024 / 1024).toFixed(2) + " MB";
+        }
+
+        // ============================================================
+        // 模式切换：编辑 ↔ 锁定
+        // ============================================================
+
+        function setMode(locked) {
+            cropLocked = locked;
+
+            if (locked) {
+                viewStart = selection.start;
+                viewEnd = selection.end;
+                modeBadge.textContent = "已确认 · 裁切后的音频";
+                modeBadge.className = "mode-badge locked";
+                canvas.classList.remove("editing");
+                canvas.classList.add("locked");
+                canvas.style.cursor = "default";
+                confirmBtn.style.display = "none";
+                editBtn.style.display = "";
+                resetBtn.disabled = true;
+                startIn.disabled = true;
+                endIn.disabled = true;
+                waveHint.textContent = "已确认裁切。下方波形只显示裁切后的片段。想修改请点「↩ 重新裁切」。";
+            } else {
+                viewStart = 0;
+                viewEnd = audioBuffer ? audioBuffer.duration : 0;
+                modeBadge.textContent = "编辑中 · 拖动选区";
+                modeBadge.className = "mode-badge editing";
+                canvas.classList.add("editing");
+                canvas.classList.remove("locked");
+                confirmBtn.style.display = "";
+                editBtn.style.display = "none";
+                resetBtn.disabled = false;
+                startIn.disabled = false;
+                endIn.disabled = false;
+                waveHint.textContent = "拖动绿色手柄调整选区，拖选区内部整体平移，点击空白处开始新选区。";
+            }
+
+            stopPreview();
+            updateRulers();
+            drawWaveform();
+            updateSelInfo();
+            updateButtons();
+        }
+
+        // ============================================================
+        // 文件加载
+        // ============================================================
+
+        async function loadAudio(file) {
+            try {
+                stopPreview();
+                const ab = await file.arrayBuffer();
+                const ctx = getCtx();
+                if (ctx.state === "suspended") await ctx.resume();
+                audioBuffer = await ctx.decodeAudioData(ab);
+                audioName = file.name;
+
+                selection.start = 0;
+                selection.end = audioBuffer.duration;
+                cropLocked = false;
+
+                fileNameEl.textContent = file.name;
+                fileNameEl.title = file.name;
+                fileDurationEl.textContent = fmtTime(audioBuffer.duration);
+                waveBox.classList.add("show");
+
+                startIn.max = audioBuffer.duration.toFixed(2);
+                endIn.max = audioBuffer.duration.toFixed(2);
+
+                syncInputsFromSel();
+                setMode(false);
+                updateButtons();
+            } catch (e) {
+                console.error(e);
+                alert("音频解码失败：" + e.message);
+                resetAll();
+            }
+        }
+
+        function resetAll() {
+            stopPreview();
+            audioBuffer = null;
+            audioName = "";
+            cropLocked = false;
+            fileInput.value = "";
+            waveBox.classList.remove("show");
+            updateSelInfo();
+            updateButtons();
+        }
+
+        // ============================================================
+        // 波形绘制
+        // ============================================================
+
+        function getMonoSamples() {
+            if (!audioBuffer) return null;
+            if (audioBuffer.numberOfChannels === 1) {
+                return audioBuffer.getChannelData(0);
+            }
+            const L = audioBuffer.getChannelData(0);
+            const R = audioBuffer.getChannelData(1);
+            const out = new Float32Array(L.length);
+            for (let i = 0; i < L.length; i++) out[i] = (L[i] + R[i]) / 2;
+            return out;
+        }
+
+        function drawWaveform() {
+            const dpr = window.devicePixelRatio || 1;
+            const W = canvas.clientWidth;
+            const H = canvas.clientHeight;
+            if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+                canvas.width = W * dpr;
+                canvas.height = H * dpr;
+            }
+            const ctx = canvas.getContext("2d");
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = "#060709";
+            ctx.fillRect(0, 0, W, H);
+
+            if (!audioBuffer) return;
+
+            const samples = getMonoSamples();
+            const sr = audioBuffer.sampleRate;
+            const viewStartSample = Math.floor(viewStart * sr);
+            const viewEndSample = Math.min(samples.length, Math.floor(viewEnd * sr));
+            const viewLen = viewEndSample - viewStartSample;
+            if (viewLen <= 0) return;
+
+            const step = viewLen / W;
+            const midY = H / 2;
+
+            // 视窗内，选区对应的像素范围
+            const sx = ((selection.start - viewStart) / (viewEnd - viewStart)) * W;
+            const ex = ((selection.end - viewStart) / (viewEnd - viewStart)) * W;
+
+            // 波形
+            for (let x = 0; x < W; x++) {
+                const i0 = viewStartSample + Math.floor(x * step);
+                const i1 = Math.min(viewEndSample, viewStartSample + Math.floor((x + 1) * step));
+                let max = 0;
+                for (let i = i0; i < i1; i++) {
+                    const v = Math.abs(samples[i]);
+                    if (v > max) max = v;
+                }
+                const h = Math.max(1, max * H * 0.85);
+                const inSel = cropLocked || (x >= sx && x <= ex);
+                ctx.fillStyle = inSel ? "#72e68a" : "#3a3f44";
+                ctx.fillRect(x, midY - h / 2, 1, h);
+            }
+
+            // 中线
+            ctx.fillStyle = "#1a1d20";
+            ctx.fillRect(0, midY, W, 1);
+
+            // 编辑态：选区外暗化 + 手柄
+            if (!cropLocked) {
+                ctx.fillStyle = "rgba(0,0,0,0.55)";
+                if (sx > 0) ctx.fillRect(0, 0, sx, H);
+                if (ex < W) ctx.fillRect(ex, 0, W - ex, H);
+
+                ctx.fillStyle = "#72e68a";
+                ctx.fillRect(sx - 1, 0, 2, H);
+                ctx.fillRect(ex - 1, 0, 2, H);
+
+                drawHandle(ctx, sx, midY, H);
+                drawHandle(ctx, ex, midY, H);
+            }
+
+            // 试听进度线
+            if (isPreviewing) {
+                const elapsed = getCtx().currentTime - previewStartCtxTime;
+                const playPos = previewOffset + elapsed;
+                const playEnd = cropLocked ? selection.end : selection.end;
+                const playBegin = cropLocked ? selection.start : selection.start;
+                if (playPos >= playBegin && playPos <= playEnd) {
+                    const px = ((playPos - viewStart) / (viewEnd - viewStart)) * W;
+                    if (px >= 0 && px <= W) {
+                        ctx.fillStyle = "#ff5a4a";
+                        ctx.fillRect(px - 1, 0, 2, H);
+                        previewRaf = requestAnimationFrame(drawWaveform);
+                    }
+                }
+            }
+        }
+
+        function drawHandle(ctx, x, midY, H) {
+            ctx.fillStyle = "#72e68a";
+            ctx.beginPath();
+            ctx.moveTo(x - 5, 0); ctx.lineTo(x + 5, 0); ctx.lineTo(x, 6);
+            ctx.closePath(); ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(x - 5, H); ctx.lineTo(x + 5, H); ctx.lineTo(x, H - 6);
+            ctx.closePath(); ctx.fill();
+
+            ctx.fillStyle = "#0a0c0e";
+            ctx.fillRect(x - 5, midY - 10, 10, 20);
+            ctx.strokeStyle = "#72e68a";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x - 5, midY - 10, 10, 20);
+
+            ctx.fillStyle = "#72e68a";
+            ctx.fillRect(x - 2, midY - 5, 1, 10);
+            ctx.fillRect(x + 1, midY - 5, 1, 10);
+        }
+
+        // ============================================================
+        // 时间刻度（跟随视图范围）
+        // ============================================================
+
+        function updateRulers() {
+            if (!audioBuffer) {
+                rulerL.textContent = "0:00.00";
+                rulerM.textContent = "";
+                rulerR.textContent = "0:00.00";
+                return;
+            }
+            rulerL.textContent = fmtTime(viewStart);
+            rulerR.textContent = fmtTime(viewEnd);
+            rulerM.textContent = fmtTime((viewStart + viewEnd) / 2);
+        }
+
+        // ============================================================
+        // 选区信息
+        // ============================================================
+
+        function updateSelInfo() {
+            if (!audioBuffer) {
+                selInfoEl.innerHTML = '选区：<span class="dim">—</span>';
+                return;
+            }
+            const dur = selection.end - selection.start;
+            const warn = dur < 3 ? ' <span class="warn">（短于 3 秒，建议加长）</span>' : "";
+            const state = cropLocked ? "已确认" : "编辑中";
+            selInfoEl.innerHTML =
+                '<span class="dim">[' + state + ']</span> ' +
+                "<b>" + selection.start.toFixed(2) + "s</b> → <b>" +
+                selection.end.toFixed(2) + "s</b>" +
+                ' <span class="dim">（' + dur.toFixed(2) + ' 秒）</span>' + warn;
+        }
+
+        function syncInputsFromSel() {
+            startIn.value = selection.start.toFixed(2);
+            endIn.value = selection.end.toFixed(2);
+        }
+
+        function clampSelection() {
+            if (!audioBuffer) return;
+            const t = audioBuffer.duration;
+            selection.start = Math.max(0, Math.min(t, selection.start));
+            selection.end = Math.max(0, Math.min(t, selection.end));
+            if (selection.end < selection.start) {
+                [selection.start, selection.end] = [selection.end, selection.start];
+            }
+            if (selection.end - selection.start < 0.05) {
+                selection.end = Math.min(t, selection.start + 0.05);
+            }
+        }
+
+        // ============================================================
+        // 交互：拖动
+        // ============================================================
+
+        function viewXToTime(x, rect) {
+            const ratio = Math.max(0, Math.min(1, x / rect.width));
+            return viewStart + ratio * (viewEnd - viewStart);
+        }
+
+        const HANDLE_HIT = 12;
+
+        canvas.addEventListener("pointerdown", (e) => {
+            if (!audioBuffer || cropLocked) return;
+            e.preventDefault();
+            canvas.setPointerCapture(e.pointerId);
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const W = rect.width;
+            const time = viewXToTime(x, rect);
+            const sx = ((selection.start - viewStart) / (viewEnd - viewStart)) * W;
+            const ex = ((selection.end - viewStart) / (viewEnd - viewStart)) * W;
+
+            if (Math.abs(x - sx) <= HANDLE_HIT) {
+                dragState = { mode: "start" };
+            } else if (Math.abs(x - ex) <= HANDLE_HIT) {
+                dragState = { mode: "end" };
+            } else if (x > sx && x < ex) {
+                dragState = { mode: "move", offset: time - selection.start };
+            } else {
+                selection.start = time;
+                selection.end = time;
+                dragState = { mode: "end" };
+            }
+            applyDrag(e);
+        });
+
+        canvas.addEventListener("pointermove", (e) => {
+            if (!audioBuffer) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const W = rect.width;
+
+            if (!dragState) {
+                if (cropLocked) return;
+                const sx = ((selection.start - viewStart) / (viewEnd - viewStart)) * W;
+                const ex = ((selection.end - viewStart) / (viewEnd - viewStart)) * W;
+                let cur = "crosshair";
+                if (Math.abs(x - sx) <= HANDLE_HIT || Math.abs(x - ex) <= HANDLE_HIT) cur = "ew-resize";
+                else if (x > sx && x < ex) cur = "grab";
+                canvas.style.cursor = cur;
+                return;
+            }
+            e.preventDefault();
+            applyDrag(e);
+        });
+
+        canvas.addEventListener("pointerup", (e) => {
+            if (!dragState) return;
+            dragState = null;
+            clampSelection();
+            syncInputsFromSel();
+            updateSelInfo();
+            drawWaveform();
+            updateButtons();
+            try { canvas.releasePointerCapture(e.pointerId); } catch (_) { }
+        });
+
+        canvas.addEventListener("pointercancel", () => {
+            dragState = null;
+            clampSelection();
+            syncInputsFromSel();
+            updateSelInfo();
+            drawWaveform();
+            updateButtons();
+        });
+
+        function applyDrag(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const time = viewXToTime(x, rect);
+            const t = audioBuffer.duration;
+
+            if (dragState.mode === "start") {
+                selection.start = Math.min(time, selection.end);
+            } else if (dragState.mode === "end") {
+                selection.end = Math.max(time, selection.start);
+            } else if (dragState.mode === "move") {
+                const len = selection.end - selection.start;
+                let ns = time - dragState.offset;
+                ns = Math.max(0, Math.min(t - len, ns));
+                selection.start = ns;
+                selection.end = ns + len;
+            }
+            syncInputsFromSel();
+            updateSelInfo();
+            drawWaveform();
+        }
+
+        // ============================================================
+        // 精调输入
+        // ============================================================
+
+        function applyPreciseInputs() {
+            if (!audioBuffer || cropLocked) return;
+            const t = audioBuffer.duration;
+            let s = parseFloat(startIn.value);
+            let e = parseFloat(endIn.value);
+            if (!isFinite(s)) s = 0;
+            if (!isFinite(e)) e = t;
+            s = Math.max(0, Math.min(t, s));
+            e = Math.max(0, Math.min(t, e));
+            if (e < s) [s, e] = [e, s];
+            if (e - s < 0.05) e = Math.min(t, s + 0.05);
+            selection.start = s;
+            selection.end = e;
+            syncInputsFromSel();
+            updateSelInfo();
+            drawWaveform();
+            updateButtons();
+        }
+
+        startIn.addEventListener("change", applyPreciseInputs);
+        endIn.addEventListener("change", applyPreciseInputs);
+
+        // ============================================================
+        // 试听
+        // ============================================================
+
+        function stopPreview() {
+            if (previewSource) {
+                try { previewSource.stop(); } catch (_) { }
+                previewSource = null;
+            }
+            if (previewRaf) {
+                cancelAnimationFrame(previewRaf);
+                previewRaf = null;
+            }
+            isPreviewing = false;
+            updatePreviewBtn();
+        }
+
+        function startPreview() {
+            if (!audioBuffer) return;
+            stopPreview();
+            const ctx = getCtx();
+            if (ctx.state === "suspended") ctx.resume();
+
+            const src = ctx.createBufferSource();
+            src.buffer = audioBuffer;
+            src.connect(ctx.destination);
+
+            const dur = selection.end - selection.start;
+            previewOffset = selection.start;
+            previewStartCtxTime = ctx.currentTime;
+            src.start(0, selection.start, dur);
+            src.onended = () => {
+                if (previewSource === src) {
+                    previewSource = null;
+                    isPreviewing = false;
+                    updatePreviewBtn();
+                    drawWaveform();
+                }
+            };
+            previewSource = src;
+            isPreviewing = true;
+            updatePreviewBtn();
+            drawWaveform();
+        }
+
+        function updatePreviewBtn() {
+            previewBtn.textContent = isPreviewing ? "■ 停止" : "▶ 试听";
+            previewBtn.classList.toggle("playing", isPreviewing);
+        }
+
+        previewBtn.addEventListener("click", () => {
+            if (isPreviewing) stopPreview();
+            else startPreview();
+        });
+
+        resetBtn.addEventListener("click", () => {
+            if (!audioBuffer || cropLocked) return;
+            selection.start = 0;
+            selection.end = audioBuffer.duration;
+            syncInputsFromSel();
+            updateSelInfo();
+            drawWaveform();
+            updateButtons();
+        });
+
+        // ============================================================
+        // 确认 / 重新裁切
+        // ============================================================
+
+        confirmBtn.addEventListener("click", () => {
+            if (!audioBuffer) return;
+            clampSelection();
+            setMode(true);
+        });
+
+        editBtn.addEventListener("click", () => {
+            if (!audioBuffer) return;
+            setMode(false);
+        });
+
+        // ============================================================
+        // 拖放 / 选择文件
+        // ============================================================
+
+        drop.addEventListener("click", () => fileInput.click());
+        fileInput.addEventListener("change", (e) => {
+            if (e.target.files[0]) loadAudio(e.target.files[0]);
+        });
+
+        ["dragenter", "dragover"].forEach((ev) =>
+            drop.addEventListener(ev, (e) => {
+                e.preventDefault();
+                drop.classList.add("hover");
+            })
+        );
+        ["dragleave", "drop"].forEach((ev) =>
+            drop.addEventListener(ev, (e) => {
+                e.preventDefault();
+                drop.classList.remove("hover");
+            })
+        );
+        drop.addEventListener("drop", (e) => {
+            const f = e.dataTransfer.files[0];
+            if (f) loadAudio(f);
+        });
+
+        clearBtn.addEventListener("click", resetAll);
+
+        // ============================================================
+        // WAV 编码
+        // ============================================================
+
+        function encodeWAV(samples, sampleRate) {
+            const num = samples.length;
+            const buffer = new ArrayBuffer(44 + num * 2);
+            const view = new DataView(buffer);
+            const writeStr = (off, str) => {
+                for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+            };
+            writeStr(0, "RIFF");
+            view.setUint32(4, 36 + num * 2, true);
+            writeStr(8, "WAVE");
+            writeStr(12, "fmt ");
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeStr(36, "data");
+            view.setUint32(40, num * 2, true);
+            for (let i = 0; i < num; i++) {
+                let s = Math.max(-1, Math.min(1, samples[i]));
+                view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            return new Blob([buffer], { type: "audio/wav" });
+        }
+
+        function exportSelectedWav() {
+            const sr = audioBuffer.sampleRate;
+            const start = Math.floor(selection.start * sr);
+            const end = Math.min(audioBuffer.length, Math.floor(selection.end * sr));
+            const len = end - start;
+            if (len <= 0) throw new Error("选区为空");
+
+            const out = new Float32Array(len);
+            if (audioBuffer.numberOfChannels === 1) {
+                out.set(audioBuffer.getChannelData(0).subarray(start, end));
+            } else {
+                const L = audioBuffer.getChannelData(0);
+                const R = audioBuffer.getChannelData(1);
+                for (let i = 0; i < len; i++) out[i] = (L[start + i] + R[start + i]) / 2;
+            }
+            return encodeWAV(out, sr);
+        }
+
+        // ============================================================
+        // 按钮状态
+        // ============================================================
+
+        function validName(s) {
+            return /^[\w\u4e00-\u9fa5\-]{1,30}$/.test(s);
+        }
+
+        function updateButtons() {
+            const hasAudio = !!audioBuffer;
+            previewBtn.disabled = !hasAudio;
+            resetBtn.disabled = !hasAudio || cropLocked;
+            confirmBtn.disabled = !hasAudio || cropLocked;
+
+            // 只有锁定后才允许提交
+            submitBtn.disabled = !(hasAudio && cropLocked &&
+                roleInput.value.trim() && emotionInput.value.trim());
+        }
+
+        roleInput.addEventListener("input", updateButtons);
+        emotionInput.addEventListener("input", updateButtons);
+
+        refTextInput.addEventListener("input", () => {
+            xvecHint.style.display = refTextInput.value.trim() ? "none" : "block";
+        });
+        xvecHint.style.display = "block";
+
+        // ============================================================
+        // 状态显示
+        // ============================================================
+
+        function setStatus(text, kind = "") {
+            statusEl.textContent = text;
+            statusEl.className = "status show" + (kind ? " " + kind : "");
+        }
+
+        // ============================================================
+        // 提交
+        // ============================================================
+
+        submitBtn.addEventListener("click", async () => {
+            const role = roleInput.value.trim();
+            const emotion = emotionInput.value.trim();
+            const refText = refTextInput.value.trim();
+            const overwrite = overwriteInput.checked;
+
+            if (!cropLocked) { setStatus("请先确认裁切（点击「✅ 确认裁切」）", "err"); return; }
+            if (!validName(role)) { setStatus("角色名只能包含字母/数字/中文/下划线/横线，1-30 字符", "err"); return; }
+            if (!validName(emotion)) { setStatus("情感名只能包含字母/数字/中文/下划线/横线，1-30 字符", "err"); return; }
+            if (!audioBuffer) { setStatus("请先上传音频", "err"); return; }
+
+            stopPreview();
+
+            let wavBlob;
+            try {
+                wavBlob = exportSelectedWav();
+            } catch (e) {
+                setStatus("导出选区失败：" + e.message, "err");
+                return;
+            }
+
+            const dur = selection.end - selection.start;
+            const selName = (audioName.replace(/\.[^.]+$/, "") || "clip") + "_clip.wav";
+
+            submitBtn.disabled = true;
+            setStatus("步骤 1/2：上传裁切后的音频（" + dur.toFixed(2) + " 秒，" +
+                fmtSize(wavBlob.size) + "）…", "");
+
+            let audioPath;
+            try {
+                const fd = new FormData();
+                fd.append("file", wavBlob, selName);
+                const res = await fetch("/api/pt/upload", { method: "POST", body: fd });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+                audioPath = data.path;
+            } catch (e) {
+                setStatus("上传失败：" + e.message, "err");
+                updateButtons();
+                return;
+            }
+
+            setStatus(
+                "步骤 2/2：提取音色特征并打包（首次会慢些，10~30 秒）…\n" +
+                "  角色 : " + role + "\n" +
+                "  情感 : " + emotion + "\n" +
+                "  模式 : " + (refText ? "ICL（完整）" : "x-vector only") + "\n" +
+                "  覆盖 : " + (overwrite ? "是" : "否"),
+                ""
+            );
+
+            try {
+                const res = await fetch("/api/pt/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ref_audio: audioPath,
+                        ref_text: refText,
+                        role, emotion, overwrite,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+
+                setStatus(
+                    "✅ 生成成功\n" +
+                    "────────────────────\n" +
+                    "音色      : " + data.role + " / " + data.emotion + "\n" +
+                    "保存路径  : " + data.rel + "\n" +
+                    "绝对路径  : " + data.path + "\n" +
+                    "条目数    : " + data.items + "\n" +
+                    "x-vector  : " + (data.x_vector_only ? "是" : "否") + "\n" +
+                    "────────────────────\n" +
+                    "下载：/api/pt/download?role=" + encodeURIComponent(role) +
+                    "&emotion=" + encodeURIComponent(emotion) + "\n" +
+                    "调用：POST /api/tts  {\"role\":\"" + role +
+                    "\",\"emotion\":\"" + emotion + "\",\"text\":\"...\"}",
+                    "ok"
+                );
+                loadLib();
+            } catch (e) {
+                setStatus("生成失败：" + e.message, "err");
+            } finally {
+                updateButtons();
+            }
+        });
+
+        // ============================================================
+        // 音色库
+        // ============================================================
+
+        async function loadLib() {
+            try {
+                const res = await fetch("/api/pt/list");
+                const data = await res.json();
+                const roles = data.roles || {};
+                const keys = Object.keys(roles);
+                if (keys.length === 0) {
+                    libEl.innerHTML = '<span class="lib-empty">还没有任何音色</span>';
+                    return;
+                }
+                libEl.innerHTML = "";
+                for (const role of keys) {
+                    for (const emo of roles[role]) {
+                        const el = document.createElement("span");
+                        el.className = "lib-item";
+                        el.textContent = role + " / " + emo;
+                        el.title = "点击填入";
+                        el.addEventListener("click", () => {
+                            roleInput.value = role;
+                            emotionInput.value = emo;
+                            updateButtons();
+                        });
+                        libEl.appendChild(el);
+                    }
+                }
+            } catch (e) {
+                libEl.innerHTML = '<span class="lib-empty">加载失败：' + e.message + '</span>';
+            }
+        }
+
+        // ============================================================
+        // 窗口变化
+        // ============================================================
+
+        let resizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => { if (audioBuffer) drawWaveform(); }, 80);
+        });
+
+        loadLib();
+        updateSelInfo();
+        updateButtons();
+    </script>
+</body>
+
+</html>
