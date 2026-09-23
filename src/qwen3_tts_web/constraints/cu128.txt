@@ -1,0 +1,7 @@
+torch==2.7.1+cu128
+torchaudio==2.7.1+cu128
+torchvision==0.22.1+cu128
+transformers==4.57.3
+accelerate==1.12.0
+qwen-tts==0.1.1
+packaging==26.3

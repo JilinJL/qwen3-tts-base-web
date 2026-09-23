@@ -80,11 +80,17 @@ def platform_profile(settings, system=None, machine=None, gpu_rows=None):
         raise RuntimeError(
             f"{row[2]} 显存 {memory:.0f} MiB，当前模型要求至少 {minimum} MiB；可选择 0.6B。"
         )
-    if capability < 6.1 or capability >= 10:
+    if capability < 6.1:
+        raise RuntimeError(
+            f"GPU sm_{capability:g} 过旧，不在支持范围内（要求 sm_61+）。"
+        )
+    # sm_12 (Blackwell/RTX 50-series) requires PyTorch 2.7+ with CUDA 12.8+
+    # sm_10, sm_11 are reserved/unsupported in current PyTorch releases
+    if capability >= 10 and capability != 12.0:
         raise RuntimeError(
             f"GPU sm_{capability:g} 不在当前固定 PyTorch 分支的支持范围；需要单独验证新版本。"
         )
-    return "cu118" if capability < 7.5 else "cu126"
+    return "cu118" if capability < 7.5 else "cu128"
 
 
 def check_port(host, port):
