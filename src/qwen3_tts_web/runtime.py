@@ -37,11 +37,11 @@ def pick_dtype(device, torch_module=None):
         return torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
 
-def load(settings):
+def load(settings, key=None):
     from .models import prepare_model
 
     device = select_device(settings.device)
-    path = prepare_model(settings)
+    path = prepare_model(settings, key=key)
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"

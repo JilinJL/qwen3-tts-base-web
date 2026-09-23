@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Qwen3-TTS · 角色台词编辑器</title>
+  <title>Qwen3-TTS · 语音工作台</title>
   <style>
     * {
       box-sizing: border-box;
@@ -375,13 +375,13 @@
         /* 信号 */
         54px
         /* 延迟 */
-        26px 26px 26px;
+        28px 28px 28px 28px 28px;
       /* ▶ ↻ × */
       gap: 4px;
       align-items: center;
     }
 
-    .list-header, .list { min-width: 840px; }
+    .list-header, .list { min-width: 930px; }
 
     .list-header {
       flex: 0 0 auto;
@@ -424,7 +424,7 @@
 
     /* 行：用 --role-* 变量着色，左竖条用 ::before */
     .clip-row {
-      padding: 5px 10px;
+      padding: 14px 10px;
       border-bottom: 1px solid #16191d;
       font-size: 11px;
       position: relative;
@@ -628,7 +628,7 @@
       cursor: not-allowed;
     }
 
-    .icon-btn.play:hover:not(:disabled) {
+    .icon-btn.play:not(:disabled) {
       color: #72e68a;
       border-color: #2f5a3a;
       background: #16261b;
@@ -678,8 +678,7 @@
     .row-badge {
       position: absolute;
       right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
+      top: 2px;
       font: 9px monospace;
       letter-spacing: 0;
       padding: 2px 6px;
@@ -699,20 +698,29 @@
       color: #e6b800;
       background: rgba(230, 184, 0, .15);
     }
-    @media (max-width: 720px) {
-      html, body { height: auto; min-height: 100%; }
-      body { overflow: auto; }
-      header { gap: 8px; }
-      .brand { flex-wrap: wrap; }
-      .brand .subtitle { display: none; }
-      .layout { flex-direction: column; overflow: visible; }
-      aside { flex: none; border-right: 0; border-bottom: 1px solid #272c32; }
-      main { flex: none; min-height: 300px; }
-      .list { flex: none; min-height: 250px; overflow: visible; }
-      footer { height: auto; min-height: 36px; flex-wrap: wrap; padding: 8px 14px; gap: 8px; }
-      footer .stat { min-width: 0; }
-      #statusText { overflow-wrap: anywhere; }
-    }
+    [hidden] { display: none !important; }
+    .mode-tabs { display: flex; gap: 0; border-bottom: 1px solid #34383e; margin-bottom: 16px; }
+    .mode-tab { flex: 1; padding: 10px 4px; background: none; border: 0; border-bottom: 2px solid transparent; color: #a4a9af; cursor: pointer; font: inherit; }
+    .mode-tab[aria-selected="true"] { color: #79dab6; border-bottom-color: #79dab6; }
+    .library-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px; border-bottom: 1px solid #303238; }
+    .library-bar h2 { font-size: 15px; margin: 0; color: #e5e5e5; }
+    .library-bar input[type=search] { min-width: 120px; width: 200px; padding: 7px 10px; color: #ddd; background: #191b1e; border: 1px solid #393c40; border-radius: 4px; }
+    .library-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+    .clip-info { min-width: 0; }
+    .clip-title { display: block; border: 0; background: none; color: #ececee; padding: 0 0 6px; font: inherit; font-weight: 600; width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+    .clip-meta { color: #a4a9af; padding-top: 6px; font-size: 10px; overflow-wrap: anywhere; }
+    .clip-error { color: #f09191; }
+    .design-label { color: #deb777; }
+    input[type=checkbox] { accent-color: #79dab6; cursor: pointer; }
+    .gen-status { white-space: normal; height: auto; min-height: 20px; overflow-wrap: anywhere; }
+    dialog { width: min(540px, calc(100% - 32px)); max-height: 90vh; overflow-y: auto; padding: 24px; color: #ddd; background: #191b1e; border: 1px solid #4a4c50; border-radius: 8px; }
+    dialog::backdrop { background: #0009; }
+    dialog h2 { margin: 0 0 20px; font-size: 18px; }
+    dialog .actions { display: flex; gap: 12px; justify-content: flex-end; }
+    .library-bar .tool-btn { min-height: 30px; }
+    .empty { color: #adb2b7; }
+    .advanced-controls summary { padding: 12px 4px; color: #bfc4c8; cursor: pointer; }
+    .advanced-controls .card { margin-top: 12px; }
   </style>
 </head>
 
@@ -721,14 +729,14 @@
   <header>
     <div class="brand">
       <span class="title">Qwen3-TTS</span>
-      <span class="subtitle">角色台词编辑器</span>
+      <span class="subtitle">语音工作台</span>
     </div>
     <div class="spacer"></div>
-    <a class="nav-link" href="/maker">音色打包器</a>
+    <a class="nav-link" href="/maker">克隆音色</a>
     <span class="queue-indicator" id="queueIndicator"></span>
     <button class="tool-btn primary" id="playBtn" disabled>▶ 播放全部</button>
     <button class="tool-btn" id="stopBtn" disabled>■ 停止</button>
-    <button class="tool-btn danger" id="clearBtn" disabled>清空</button>
+    <button class="tool-btn danger" id="clearBtn" disabled>删除全部</button>
   </header>
 
   <div class="layout">
@@ -737,7 +745,12 @@
     <aside>
 
       <section class="card">
-        <h3>新建台词 <span class="badge" id="ptHint">加载中…</span></h3>
+        <h3>生成语音 <span class="badge" id="ptHint">加载中…</span></h3>
+        <div class="mode-tabs" role="tablist" aria-label="生成方式">
+          <button class="mode-tab" id="cloneTab" role="tab" aria-selected="true" aria-controls="cloneFields">角色音色</button>
+          <button class="mode-tab" id="designTab" role="tab" aria-selected="false" aria-controls="designFields">描述音色</button>
+        </div>
+        <div id="cloneFields" role="tabpanel" aria-labelledby="cloneTab">
         <div class="field">
           <label for="genRole">角色</label>
           <select id="genRole"></select>
@@ -746,6 +759,14 @@
           <label for="genEmotion">情绪（选填）</label>
           <select id="genEmotion"></select>
         </div>
+        </div>
+        <div id="designFields" role="tabpanel" aria-labelledby="designTab" hidden>
+          <div class="field">
+            <label for="genInstruct">音色描述</label>
+            <textarea id="genInstruct" maxlength="2000" placeholder="年轻女性，温暖清晰的中音，语速舒缓，带自然的微笑感。"></textarea>
+          </div>
+          <div class="gen-status" id="designModelStatus">VoiceDesign · 检查中</div>
+        </div>
         <div class="field">
           <label for="genLanguage">语言</label>
           <select id="genLanguage">
@@ -753,17 +774,25 @@
             <option value="English" lang="en">English</option>
             <option value="Japanese" lang="ja">日本語</option>
             <option value="Korean" lang="ko">한국어</option>
+            <option value="French" lang="fr">Français</option>
+            <option value="German" lang="de">Deutsch</option>
+            <option value="Spanish" lang="es">Español</option>
+            <option value="Italian" lang="it">Italiano</option>
+            <option value="Portuguese" lang="pt">Português</option>
+            <option value="Russian" lang="ru">Русский</option>
             <option value="Auto">自动检测</option>
           </select>
         </div>
         <div class="field">
           <label for="genText">台词</label>
-          <textarea id="genText" placeholder="输入台词…"></textarea>
+          <textarea id="genText" maxlength="10000" placeholder="输入台词…"></textarea>
         </div>
         <button class="btn primary" id="genBtn">+ 加入生成队列</button>
         <div class="gen-status" id="genStatus">就绪</div>
       </section>
 
+      <details class="advanced-controls">
+      <summary>播放音效与统计</summary>
       <section class="card">
         <h3>新片段默认预设</h3>
         <div class="grid-2">
@@ -818,25 +847,41 @@
         </div>
       </section>
 
+      </details>
     </aside>
 
     <!-- ============ 列表 ============ -->
     <main>
+      <div class="library-bar">
+        <h2>本地语音库</h2>
+        <input type="search" id="librarySearch" aria-label="搜索语音" placeholder="搜索标题、台词、音色">
+        <div class="spacer"></div>
+        <label><input type="checkbox" id="selectAll" aria-label="选择当前列表"> 全选</label>
+        <span id="selectionCount">0 项已选</span>
+        <button class="tool-btn" id="refreshLibrary" title="刷新语音库" aria-label="刷新语音库">↻</button>
+        <button class="tool-btn" id="exportSelected" disabled>导出所选 WAV</button>
+        <button class="tool-btn" id="exportAll" disabled>导出全部 WAV</button>
+        <button class="tool-btn danger" id="deleteSelected" disabled>删除所选</button>
+      </div>
+      <div class="library-scroll">
       <div class="list-header">
         <div></div>
-        <div class="hdr">#</div>
-        <div class="hdr left">角色</div>
-        <div class="hdr left">情绪</div>
-        <div class="hdr left">台词</div>
+        <div class="hdr">选择</div>
+        <div class="hdr left">音色</div>
+        <div class="hdr left">情绪 / 描述</div>
+        <div class="hdr left">名称与台词</div>
         <div class="hdr">设备</div>
         <div class="hdr">信号</div>
         <div class="hdr">延迟</div>
         <div class="hdr">▶</div>
         <div class="hdr">↻</div>
+        <div class="hdr">编辑</div>
+        <div class="hdr">导出</div>
         <div class="hdr">×</div>
       </div>
       <div class="list" id="list">
-        <div class="empty"><b>暂无台词</b>在左侧选择角色和感情，输入文本后「加入生成队列」</div>
+        <div class="empty"><b>正在读取本地语音库</b></div>
+      </div>
       </div>
     </main>
 
@@ -851,6 +896,17 @@
     <span class="sep">│</span>
     <span class="stat">已生成 <b id="footReady">0</b></span>
   </footer>
+  <dialog id="editDialog" aria-labelledby="editHeading">
+    <form id="editForm">
+      <h2 id="editHeading">编辑语音</h2>
+      <div class="field"><label for="editTitle">名称</label><input id="editTitle" maxlength="200"></div>
+      <div class="field"><label for="editText">台词</label><textarea id="editText" maxlength="10000"></textarea></div>
+      <div class="field"><label for="editLanguage">语言</label><select id="editLanguage"></select></div>
+      <div class="field" id="editInstructField"><label for="editInstruct">音色描述</label><textarea id="editInstruct" maxlength="2000"></textarea></div>
+      <div class="gen-status" id="editStatus" role="status"></div>
+      <div class="actions"><button type="button" class="tool-btn" id="cancelEdit">取消</button><button class="tool-btn primary" id="saveEdit" type="submit">保存</button></div>
+    </form>
+  </dialog>
 
   <script>
     // ============================================================
@@ -1037,6 +1093,13 @@
     let activeStop = null;
     let dragId = null;
     let singlePlayingId = null;
+    let playbackSession = 0;
+    let generatorMode = 'clone';
+    let libraryLoaded = false;
+    let editingClip = null;
+    let designCapability = null;
+    const selectedClips = new Set();
+    const LANGUAGE_NAMES = {Chinese: '中文', English: 'English', Japanese: '日本語', Korean: '한국어', French: 'Français', German: 'Deutsch', Spanish: 'Español', Italian: 'Italiano', Portuguese: 'Português', Russian: 'Русский', Auto: '自动检测'};
 
     // 角色数据
     let rolesData = {};          // {角色: [情感, ...]}
@@ -1117,6 +1180,139 @@
     function setGenStatus(t, cls = "") {
       genStatus.textContent = t;
       genStatus.className = "gen-status " + cls;
+    }
+
+    async function apiRequest(url, options = {}) {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const detail = data.detail;
+        throw new Error(typeof detail === 'string' ? detail : detail?.message || JSON.stringify(detail || response.statusText));
+      }
+      return response;
+    }
+
+    function clipMetadata(clip) {
+      return {title: clip.title || '', text: clip.text || '', role: clip.role || '',
+        emotion: clip.emotion || '平静', language: clip.language || 'Chinese',
+        synthesis_mode: clip.synthesis_mode || 'clone', instruct: clip.instruct || '',
+        speaker: clip.speaker || 'raw', signal: clip.signal || 'raw', delay: clip.delay || 0,
+        position: Math.max(0, clips.indexOf(clip))};
+    }
+
+    function saveClip(clip) {
+      const metadata = clipMetadata(clip);
+      // Serialize edits per record so slower requests cannot overwrite newer input.
+      clip.saving = (clip.saving || Promise.resolve()).catch(() => {}).then(async () => {
+        if (!clip.serverId) throw new Error('记录尚未保存');
+        await apiRequest('/api/clips/' + clip.serverId, {method: 'PATCH',
+          headers: {'Content-Type': 'application/json'}, body: JSON.stringify(metadata), keepalive: true});
+        clip.saveError = null;
+      });
+      clip.saving.catch(error => { clip.saveError = error.message; setStatus('保存失败：' + error.message); });
+      return clip.saving;
+    }
+
+    function applyRecord(clip, record) {
+      clip.serverId = record.id;
+      clip.url = record.available ? record.url : null;
+      clip.duration = record.duration || 0;
+      clip.created_at = record.created_at;
+      const generated = record.generated || {};
+      clip.generatedRole = generated.role ?? clip.role;
+      clip.generatedEmotion = generated.emotion ?? clip.emotion;
+      clip.generatedText = generated.text ?? clip.text;
+      clip.generatedLanguage = generated.language ?? clip.language;
+      clip.generatedInstruct = generated.instruct ?? clip.instruct;
+      clip.error = record.filename && !record.available ? '音频文件缺失' : null;
+    }
+
+    async function loadLibrary() {
+      if (queueWorkerRunning || playlistRunning || singlePlayingId !== null) { setStatus('任务结束后再刷新'); return; }
+      try {
+        await Promise.all(clips.map(clip => clip.saveError ? saveClip(clip) : clip.saving));
+        const data = await (await apiRequest('/api/clips')).json();
+        clips.length = 0;
+        selectedClips.clear();
+        for (const record of data.clips) {
+          const clip = {speaker: 'raw', signal: 'raw', delay: 0, role: '', emotion: '平静',
+            language: 'Chinese', instruct: '', ...record, id: ++clipIdCounter, buffer: null};
+          applyRecord(clip, record);
+          clips.push(clip);
+        }
+        libraryLoaded = true;
+        setStatus('本地语音库已同步');
+        renderList();
+        updateGeneratorMode();
+      } catch (error) { setStatus('读取失败：' + error.message); }
+    }
+
+    function visibleClips() {
+      const query = $('librarySearch').value.trim().toLocaleLowerCase();
+      return clips.filter(clip => [clip.title, clip.text, clip.role, clip.instruct].join(' ').toLocaleLowerCase().includes(query));
+    }
+
+    function updateSelection() {
+      const visible = visibleClips();
+      $('selectionCount').textContent = selectedClips.size + ' 项已选';
+      $('selectAll').checked = visible.length > 0 && visible.every(clip => selectedClips.has(clip.id));
+      $('selectAll').indeterminate = visible.some(clip => selectedClips.has(clip.id)) && !$('selectAll').checked;
+      $('exportSelected').disabled = !clips.some(clip => clip.url && selectedClips.has(clip.id));
+      $('exportAll').disabled = !clips.some(clip => clip.url);
+      $('deleteSelected').disabled = selectedClips.size === 0 || queueWorkerRunning || playlistRunning || singlePlayingId !== null;
+    }
+
+    async function exportClips(selectedOnly) {
+      const records = clips.filter(clip => clip.url && (!selectedOnly || selectedClips.has(clip.id)));
+      if (!records.length) return;
+      try {
+        await Promise.all(records.map(clip => clip.saving));
+        const response = await apiRequest('/api/clips/export', {method: 'POST',
+          headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ids: records.map(clip => clip.serverId)})});
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url; link.download = 'qwen3-tts-audio.zip'; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        setStatus('已导出 ' + records.length + ' 个原始 WAV');
+      } catch (error) { setStatus('导出失败：' + error.message); }
+    }
+
+    async function loadCapabilities() {
+      designCapability = null;
+      try {
+        const data = await (await apiRequest('/api/capabilities')).json();
+        designCapability = data.voice_design;
+        $('designModelStatus').textContent = 'VoiceDesign 1.7B · ' + (designCapability.installed ? '已安装' : designCapability.offline ? '未安装 · 离线模式' : '首次生成需下载模型');
+      } catch (error) { $('designModelStatus').textContent = '模型检查失败：' + error.message; }
+    }
+
+    function updateGeneratorMode() {
+      const design = generatorMode === 'design';
+      $('cloneTab').setAttribute('aria-selected', String(!design));
+      $('designTab').setAttribute('aria-selected', String(design));
+      $('cloneFields').hidden = design;
+      $('designFields').hidden = !design;
+      genBtn.disabled = !libraryLoaded || (!design && !roleList.length);
+    }
+
+    function openEdit(clip) {
+      editingClip = clip;
+      $('editTitle').value = clip.title || '';
+      $('editText').value = clip.text || '';
+      $('editLanguage').innerHTML = genLanguage.innerHTML;
+      $('editLanguage').value = clip.language;
+      $('editInstruct').value = clip.instruct || '';
+      $('editInstructField').hidden = clip.synthesis_mode !== 'design';
+      $('editStatus').textContent = '';
+      $('editDialog').showModal();
+    }
+
+    async function ensureBuffer(clip) {
+      if (clip.buffer) return;
+      if (!clip.url) throw new Error('音频尚未生成或文件已丢失');
+      const response = await apiRequest(clip.url);
+      clip.buffer = await ensureCtx().decodeAudioData(await response.arrayBuffer());
+      clip.error = null;
     }
 
     // ============================================================
@@ -1524,8 +1720,8 @@
 
     function updateStats() {
       const pending = jobQueue.length + (activeJob ? 1 : 0);
-      const ready = clips.filter(c => c.buffer && !c.generating).length;
-      const total = clips.reduce((s, c) => s + (c.buffer ? c.buffer.duration : 0), 0);
+      const ready = clips.filter(c => c.url).length;
+      const total = clips.reduce((s, c) => s + (c.duration || 0), 0);
 
       statClips.textContent = clips.length;
       statQueue.textContent = pending;
@@ -1537,7 +1733,7 @@
       footReady.textContent = ready;
 
       if (pending > 0) {
-        queueIndicator.textContent = "⏳ 队列 " + pending;
+        queueIndicator.textContent = "队列 " + pending;
         queueIndicator.classList.add("on");
       } else {
         queueIndicator.classList.remove("on");
@@ -1545,7 +1741,8 @@
 
       playBtn.disabled = playlistRunning || singlePlayingId !== null || ready === 0;
       stopBtn.disabled = !playlistRunning && singlePlayingId === null;
-      clearBtn.disabled = playlistRunning || singlePlayingId !== null || clips.length === 0;
+      clearBtn.disabled = playlistRunning || singlePlayingId !== null || queueWorkerRunning || clips.length === 0;
+      updateSelection();
     }
 
     async function processQueue() {
@@ -1570,7 +1767,7 @@
         } catch (e) {
           console.error("[queue] job failed:", job, e);
           const c2 = clips.find(c => c.id === job.clipId);
-          if (c2) { c2.generating = false; c2.queued = false; }
+          if (c2) { c2.generating = false; c2.queued = false; c2.error = e.message; }
           setStatus("错误：" + e.message);
           renderList();
         }
@@ -1588,9 +1785,10 @@
       const clip = clips.find(c => c.id === job.clipId);
       if (!clip) return;
 
-      setStatus(`生成中：${job.role}/${job.emotion}「${job.text.slice(0, 16)}」`);
+      setStatus(`生成中：${job.synthesis_mode === 'design' ? '描述音色' : job.role}「${job.text.slice(0, 16)}」`);
+      await clip.saving;
 
-      const resp = await fetch("/api/tts", {
+      const resp = await apiRequest(job.synthesis_mode === 'design' ? '/api/voice-design' : '/api/tts', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1599,6 +1797,9 @@
           text: job.text,
           language: job.language,
           mode: "url",
+          instruct: job.instruct,
+          clip_id: clip.serverId,
+          allow_download: job.allow_download || false,
         }),
       });
       if (!resp.ok) {
@@ -1607,24 +1808,14 @@
       }
       const data = await resp.json();
 
-      const audioResp = await fetch(data.url + "?t=" + Date.now());
-      if (!audioResp.ok) throw new Error("下载失败: " + audioResp.status);
-
-      const ab = await audioResp.arrayBuffer();
-      const decoded = await ensureCtx().decodeAudioData(ab);
-
       const i = clips.findIndex(c => c.id === job.clipId);
       if (i < 0) return;
-
-      clips[i].buffer = decoded;
-      clips[i].generatedRole = job.role;
-      clips[i].generatedEmotion = job.emotion;
-      clips[i].generatedText = job.text;
-      clips[i].generatedLanguage = job.language;
+      applyRecord(clips[i], data.clip);
+      clips[i].buffer = null;
       clips[i].generating = false;
       clips[i].queued = false;
-
-      setStatus(`完成：${job.role}/${job.emotion}`);
+      setStatus('已生成并保存到本地语音库');
+      if (job.synthesis_mode === 'design') loadCapabilities();
     }
 
     // ============================================================
@@ -1632,45 +1823,59 @@
     // ============================================================
     async function runPlaylist() {
       if (playlistRunning) return;
-      const playable = clips.filter(c => c.buffer);
+      const playable = clips.filter(c => c.url);
       if (playable.length === 0) return;
 
       if (singlePlayingId !== null && activeStop) {
         activeStop(); activeStop = null; singlePlayingId = null;
       }
 
+      const session = ++playbackSession;
+      // Resume inside the user gesture; decoding is no longer a generation prerequisite.
+      const resumed = ensureCtx().resume();
       playlistRunning = true;
       updateStats();
       renderList();
 
-      for (let i = 0; i < clips.length; i++) {
-        if (!playlistRunning) break;
-        const clip = clips[i];
-        if (!clip.buffer) continue;
+      try {
+      await resumed;
+      for (let i = 0; i < playable.length; i++) {
+        if (session !== playbackSession) break;
+        const clip = playable[i];
 
         singlePlayingId = clip.id;
         renderList();
 
-        try { await playClipAsync(clip); } catch (e) { console.error(e); }
+        try {
+          await ensureBuffer(clip);
+          if (session !== playbackSession) break;
+          await playClipAsync(clip);
+        } catch (e) {
+          clip.error = '播放失败：' + e.message;
+          setStatus(clip.error);
+        }
+        if (session !== playbackSession) break;
         singlePlayingId = null;
 
         if (!playlistRunning) break;
 
-        if (i < clips.length - 1 && clip.delay > 0) {
+        if (i < playable.length - 1 && clip.delay > 0) {
           setStatus(`等待 ${clip.delay.toFixed(2)}s`);
           await sleep(clip.delay * 1000);
         }
       }
-
+      } catch (error) { setStatus('播放失败：' + error.message); }
+      if (session !== playbackSession) return;
       playlistRunning = false;
       singlePlayingId = null;
       renderList();
       updateStats();
-      setStatus("完成");
+      setStatus(playable.some(clip => clip.error) ? '播放结束，部分音频加载失败，可重试' : '播放完成');
     }
 
     function stopPlaylist() {
       if (!playlistRunning && singlePlayingId === null) return;
+      ++playbackSession;
       playlistRunning = false;
       if (activeStop) { activeStop(); activeStop = null; }
       singlePlayingId = null;
@@ -1681,28 +1886,32 @@
 
     async function playSingle(clip) {
       if (singlePlayingId === clip.id) {
-        if (activeStop) { activeStop(); activeStop = null; }
-        singlePlayingId = null;
-        renderList(); updateStats();
-        setStatus("停止");
+        stopPlaylist();
         return;
       }
       if (playlistRunning) stopPlaylist();
       if (singlePlayingId !== null && activeStop) {
         activeStop(); activeStop = null;
       }
-      if (!clip.buffer) return;
+      if (!clip.url) return;
+      const session = ++playbackSession;
+      const resumed = ensureCtx().resume();
 
       singlePlayingId = clip.id;
       renderList(); updateStats();
       setStatus(`播放 #${clip.id} ${clip.role}/${clip.emotion}`);
 
-      try { await playClipAsync(clip); } catch (e) { console.error(e); }
+      try {
+        await resumed;
+        await ensureBuffer(clip);
+        if (session !== playbackSession) return;
+        await playClipAsync(clip);
+      } catch (e) { clip.error = '播放失败：' + e.message; setStatus(clip.error); }
 
-      if (singlePlayingId === clip.id) {
+      if (session === playbackSession) {
         singlePlayingId = null;
         renderList(); updateStats();
-        setStatus("就绪");
+        setStatus(clip.error || '就绪');
       }
     }
 
@@ -1710,20 +1919,24 @@
     // 列表渲染
     // ============================================================
     function isDirty(clip) {
-      if (!clip.buffer) return false;
+      if (!clip.url) return false;
       return clip.role !== clip.generatedRole
         || clip.emotion !== clip.generatedEmotion
-        || clip.text !== clip.generatedText;
+        || clip.text !== clip.generatedText
+        || clip.language !== clip.generatedLanguage
+        || clip.instruct !== clip.generatedInstruct;
     }
 
     function renderList() {
       if (clips.length === 0) {
-        listEl.innerHTML = '<div class="empty"><b>暂无台词</b>在左侧选择角色和感情，输入文本后「加入生成队列」</div>';
+        listEl.innerHTML = '<div class="empty"><b>暂无语音</b></div>';
         updateStats();
         return;
       }
       listEl.innerHTML = "";
-      clips.forEach((clip, idx) => listEl.appendChild(buildRow(clip, idx)));
+      const visible = visibleClips();
+      visible.forEach((clip, idx) => listEl.appendChild(buildRow(clip, idx)));
+      if (!visible.length) listEl.innerHTML = '<div class="empty"><b>没有匹配的语音</b></div>';
       updateStats();
     }
 
@@ -1739,16 +1952,19 @@
       if (isDirty(clip) && !clip.generating && !clip.queued) row.classList.add("dirty");
 
       const busy = playlistRunning || singlePlayingId !== null;
+      const locked = busy || clip.generating || clip.queued;
+      const design = clip.synthesis_mode === 'design';
+      const legacy = clip.synthesis_mode === 'legacy';
 
       // ---- grip ----
       const grip = document.createElement("span");
       grip.className = "grip";
       grip.textContent = "⠿";
       grip.title = busy ? "播放中不可拖动" : "拖动排序";
-      grip.draggable = !busy;
+      grip.draggable = !busy && !$('librarySearch').value.trim();
       grip.setAttribute("aria-disabled", String(busy));
       grip.addEventListener("dragstart", (e) => {
-        if (busy) { e.preventDefault(); return; }
+        if (!grip.draggable) { e.preventDefault(); return; }
         dragId = clip.id;
         row.classList.add("dragging");
         e.dataTransfer.effectAllowed = "move";
@@ -1764,9 +1980,15 @@
       });
 
       // ---- idx ----
-      const idxEl = document.createElement("span");
+      const idxEl = document.createElement("input");
+      idxEl.type = 'checkbox';
       idxEl.className = "idx";
-      idxEl.textContent = (idx + 1).toString().padStart(2, "0");
+      idxEl.setAttribute('aria-label', '选择语音 ' + (clip.title || idx + 1));
+      idxEl.checked = selectedClips.has(clip.id);
+      idxEl.addEventListener('change', () => {
+        if (idxEl.checked) selectedClips.add(clip.id); else selectedClips.delete(clip.id);
+        updateSelection();
+      });
 
       // ---- 角色 ----
       const roleEl = document.createElement("select");
@@ -1785,7 +2007,11 @@
           roleEl.appendChild(o);
         });
       }
-      roleEl.disabled = busy || clip.generating || clip.queued;
+      if (design || legacy) {
+        roleEl.replaceChildren(new Option(design ? '描述音色' : '历史音频', ''));
+        roleEl.classList.add('design-label');
+      }
+      roleEl.disabled = locked || design || legacy;
       roleEl.addEventListener("change", () => {
         clip.role = roleEl.value;
         // 重建情感下拉
@@ -1803,7 +2029,7 @@
       const emoEl = document.createElement("select");
       emoEl.className = "cell-select emo-select";
       rebuildEmotionSelect(emoEl, clip.role, clip.emotion);
-      emoEl.disabled = busy || clip.generating || clip.queued;
+      emoEl.disabled = locked || design || legacy;
       emoEl.addEventListener("change", () => {
         clip.emotion = emoEl.value;
         refreshRowDirtyState(row, clip, textEl, regenIco);
@@ -1821,10 +2047,26 @@
         clip.text = textEl.value;
         refreshRowDirtyState(row, clip, textEl, regenIco);
       });
+      const info = document.createElement('div');
+      info.className = 'clip-info';
+      const title = document.createElement('button');
+      title.className = 'clip-title';
+      title.textContent = clip.title || '未命名语音';
+      title.title = '编辑名称与生成参数';
+      title.disabled = locked;
+      title.onclick = () => openEdit(clip);
+      const meta = document.createElement('div');
+      meta.className = 'clip-meta' + (clip.error ? ' clip-error' : '');
+      meta.textContent = clip.error || [LANGUAGE_NAMES[clip.language] || clip.language,
+        clip.url ? clip.duration.toFixed(2) + 's' : '未生成',
+        isDirty(clip) ? '参数已修改 · 待重新生成' : clip.url ? '已保存' : '',
+        clip.created_at ? new Date(clip.created_at).toLocaleString() : ''].filter(Boolean).join(' · ');
+      info.append(title, textEl, meta);
 
       // ---- 设备 ----
       const spEl = document.createElement("select");
-      spEl.className = "cell-select";
+      spEl.className = "cell-select speaker-cell";
+      spEl.setAttribute('aria-label', '播放设备音效');
       for (const k of Object.keys(SPEAKER_PRESETS)) {
         const o = document.createElement("option");
         o.value = k; o.textContent = k.toUpperCase();
@@ -1832,11 +2074,12 @@
         spEl.appendChild(o);
       }
       spEl.disabled = busy;
-      spEl.addEventListener("change", () => { clip.speaker = spEl.value; });
+      spEl.addEventListener("change", () => { clip.speaker = spEl.value; saveClip(clip); });
 
       // ---- 信号 ----
       const sgEl = document.createElement("select");
-      sgEl.className = "cell-select";
+      sgEl.className = "cell-select signal-cell";
+      sgEl.setAttribute('aria-label', '播放信号音效');
       for (const k of Object.keys(SIGNAL_PRESETS)) {
         const o = document.createElement("option");
         o.value = k; o.textContent = k.toUpperCase();
@@ -1844,19 +2087,20 @@
         sgEl.appendChild(o);
       }
       sgEl.disabled = busy;
-      sgEl.addEventListener("change", () => { clip.signal = sgEl.value; });
+      sgEl.addEventListener("change", () => { clip.signal = sgEl.value; saveClip(clip); });
 
       // ---- 延迟 ----
       const dWrap = document.createElement("div");
       dWrap.className = "delay-wrap";
       const dEl = document.createElement("input");
       dEl.type = "number";
+      dEl.setAttribute('aria-label', '播放后延迟秒数');
       dEl.className = "cell-input";
       dEl.min = "0"; dEl.step = "0.1";
       dEl.value = clip.delay;
       dEl.disabled = busy;
       dEl.addEventListener("input", () => { clip.delay = Math.max(0, parseFloat(dEl.value) || 0); });
-      dEl.addEventListener("blur", () => { dEl.value = clip.delay; });
+      dEl.addEventListener("blur", () => { dEl.value = clip.delay; saveClip(clip); });
       dWrap.appendChild(dEl);
 
       // ---- ▶ ----
@@ -1865,7 +2109,7 @@
       playIco.className = "icon-btn play" + (isThis ? " active" : "");
       playIco.textContent = isThis ? "■" : "▶";
       playIco.title = isThis ? "停止" : "播放此条";
-      playIco.disabled = !clip.buffer || playlistRunning;
+      playIco.disabled = !clip.url || playlistRunning;
       playIco.addEventListener("click", () => playSingle(clip));
 
       // ---- ↻ ----
@@ -1873,12 +2117,16 @@
       regenIco.className = "icon-btn regen" + (isDirty(clip) ? " hot" : "");
       regenIco.textContent = "↻";
       regenIco.title = isDirty(clip) ? "应用修改并重新生成" : "重新生成";
-      regenIco.disabled = busy || clip.generating || clip.queued;
-      regenIco.addEventListener("click", () => {
+      regenIco.disabled = locked || legacy;
+      regenIco.addEventListener("click", async () => {
         const t = (clip.text || "").trim();
         if (!t) { setStatus("文本不能为空"); return; }
-        if (!clip.role) { setStatus("未选择角色"); return; }
+        if (!design && !clip.role) { setStatus("未选择角色"); return; }
+        if (design && !clip.instruct.trim()) { setStatus('请填写音色描述'); return; }
+        const consent = await designDownloadConsent(design);
+        if (consent === null) return;
         clip.emotion = clip.emotion || "平静";
+        clip.error = null;
         clip.queued = true;
         renderList();
         enqueueJob({
@@ -1887,6 +2135,9 @@
           emotion: clip.emotion,
           text: t,
           language: clip.language,
+          synthesis_mode: clip.synthesis_mode,
+          instruct: clip.instruct,
+          allow_download: consent,
         });
         setStatus("已加入队列");
       });
@@ -1896,8 +2147,19 @@
       delIco.className = "icon-btn del";
       delIco.textContent = "×";
       delIco.title = "删除";
-      delIco.disabled = busy;
+      delIco.disabled = locked;
       delIco.addEventListener("click", () => removeClip(clip.id));
+      const editIco = document.createElement('button');
+      editIco.className = 'icon-btn edit'; editIco.textContent = '✎';
+      editIco.title = '编辑语音'; editIco.disabled = locked;
+      editIco.onclick = () => openEdit(clip);
+      const downloadIco = document.createElement('button');
+      downloadIco.className = 'icon-btn download'; downloadIco.textContent = '↓';
+      downloadIco.title = '导出原始 WAV'; downloadIco.disabled = !clip.url;
+      downloadIco.onclick = () => {
+        const link = document.createElement('a');
+        link.href = '/api/clips/' + clip.serverId + '/download'; link.click();
+      };
 
       // ---- 角标 ----
       const badge = document.createElement("span");
@@ -1911,13 +2173,20 @@
       row.appendChild(grip);
       row.appendChild(idxEl);
       row.appendChild(roleEl);
-      row.appendChild(emoEl);
-      row.appendChild(textEl);
+      if (design) {
+        const prompt = document.createElement('button');
+        prompt.className = 'cell-input design-label prompt-cell'; prompt.textContent = '音色描述';
+        prompt.title = clip.instruct; prompt.disabled = locked;
+        prompt.onclick = () => openEdit(clip); row.appendChild(prompt);
+      } else row.appendChild(emoEl);
+      row.appendChild(info);
       row.appendChild(spEl);
       row.appendChild(sgEl);
       row.appendChild(dWrap);
       row.appendChild(playIco);
       row.appendChild(regenIco);
+      row.appendChild(editIco);
+      row.appendChild(downloadIco);
       row.appendChild(delIco);
       row.appendChild(badge);
 
@@ -1929,6 +2198,7 @@
       textEl.classList.toggle("changed", d);
       row.classList.toggle("dirty", d && !clip.generating && !clip.queued);
       regenIco.classList.toggle("hot", d);
+      saveClip(clip);
     }
 
     function rebuildEmotionSelect(selectEl, role, selected) {
@@ -1966,6 +2236,7 @@
     listEl.addEventListener("drop", (e) => { if (dragId) e.preventDefault(); });
 
     function syncOrderFromDOM() {
+      if ($('librarySearch').value.trim()) return;
       const ids = Array.from(listEl.querySelectorAll(".clip-row")).map(el => parseInt(el.dataset.id, 10));
       const sorted = [];
       for (const id of ids) {
@@ -1974,30 +2245,37 @@
       }
       clips.length = 0;
       clips.push(...sorted);
+      clips.forEach(clip => saveClip(clip));
     }
 
     // ============================================================
     // 增删
     // ============================================================
-    function removeClip(id) {
+    async function removeClip(id, confirmed = false) {
       const busy = playlistRunning || singlePlayingId !== null;
       if (busy) return;
+      const clip = clips.find(c => c.id === id);
+      if (!clip || clip.generating || clip.queued) return;
+      if (!confirmed && !confirm('永久删除这条记录及其本地音频文件？')) return;
+      try {
+        await clip.saving?.catch(() => {});
+        await apiRequest('/api/clips/' + clip.serverId, {method: 'DELETE'});
+      } catch (error) { setStatus('删除失败：' + error.message); return; }
       if (singlePlayingId === id && activeStop) { activeStop(); activeStop = null; singlePlayingId = null; }
       const i = clips.findIndex(c => c.id === id);
       if (i >= 0) clips.splice(i, 1);
       const qi = jobQueue.findIndex(j => j.clipId === id);
       if (qi >= 0) jobQueue.splice(qi, 1);
+      selectedClips.delete(id);
       renderList();
       setStatus("已删除");
     }
 
-    function clearAll() {
-      const busy = playlistRunning || singlePlayingId !== null;
-      if (busy) return;
-      clips.length = 0;
-      jobQueue.length = 0;
-      renderList();
-      setStatus("已清空");
+    async function clearAll(selectedOnly = false) {
+      if (playlistRunning || singlePlayingId !== null || queueWorkerRunning) return;
+      const targets = clips.filter(clip => !selectedOnly || selectedClips.has(clip.id));
+      if (!targets.length || !confirm('永久删除 ' + targets.length + ' 条记录及其本地音频文件？')) return;
+      for (const clip of targets) await removeClip(clip.id, true);
     }
 
     // ============================================================
@@ -2005,19 +2283,19 @@
     // ============================================================
     function applySpeakerToAll() {
       const sp = defSpeaker.value;
-      clips.forEach(c => { c.speaker = sp; });
+      clips.forEach(c => { c.speaker = sp; saveClip(c); });
       renderList();
       setStatus(`设备 ${sp.toUpperCase()} 已套用到 ${clips.length} 段`);
     }
     function applySignalToAll() {
       const sg = defSignal.value;
-      clips.forEach(c => { c.signal = sg; });
+      clips.forEach(c => { c.signal = sg; saveClip(c); });
       renderList();
       setStatus(`信号 ${sg.toUpperCase()} 已套用到 ${clips.length} 段`);
     }
     function applyBothToAll() {
       const sp = defSpeaker.value, sg = defSignal.value;
-      clips.forEach(c => { c.speaker = sp; c.signal = sg; });
+      clips.forEach(c => { c.speaker = sp; c.signal = sg; saveClip(c); });
       renderList();
       setStatus(`已套用 ${sp.toUpperCase()} + ${sg.toUpperCase()} 到 ${clips.length} 段`);
     }
@@ -2055,10 +2333,10 @@
         const o2 = document.createElement("option");
         o2.value = ""; o2.textContent = "(无)";
         genEmotion.appendChild(o2);
-        genBtn.disabled = true;
+        updateGeneratorMode();
         return;
       }
-      genBtn.disabled = false;
+      updateGeneratorMode();
       roleList.forEach(r => {
         const o = document.createElement("option");
         o.value = r; o.textContent = r;
@@ -2110,19 +2388,35 @@
     // ============================================================
     // 新建台词
     // ============================================================
-    function generateClip() {
-      const role = genRole.value;
+    async function designDownloadConsent(design) {
+      if (!design) return false;
+      await loadCapabilities();
+      if (!designCapability) { setGenStatus('无法检查模型状态，请重试', 'err'); return null; }
+      if (designCapability.installed) return false;
+      if (designCapability.offline) { setGenStatus('离线模式下 VoiceDesign 模型未安装，请先下载模型', 'err'); return null; }
+      return confirm('首次使用描述音色需要下载 VoiceDesign 1.7B 完整模型（数 GB），并切换当前推理模型。继续？') ? true : null;
+    }
+
+    async function generateClip() {
+      if (!libraryLoaded || genBtn.disabled) return;
+      const synthesis_mode = generatorMode;
+      const role = synthesis_mode === 'design' ? '' : genRole.value;
       const emotion = genEmotion.value || "平静";
       const text = genText.value.trim();
       const language = genLanguage.value;
+      const instruct = synthesis_mode === 'design' ? $('genInstruct').value.trim() : '';
 
-      if (!role) { setGenStatus("请先选择角色", "err"); return; }
+      if (synthesis_mode === 'clone' && !role) { setGenStatus("请先选择角色", "err"); return; }
+      if (synthesis_mode === 'design' && !instruct) { setGenStatus('请填写音色描述', 'err'); return; }
       if (!text) { setGenStatus("请输入文本", "err"); return; }
-
+      genBtn.disabled = true;
+      try {
+      const allow_download = await designDownloadConsent(synthesis_mode === 'design');
+      if (allow_download === null) return;
       const clipId = ++clipIdCounter;
-      clips.push({
+      const clip = {
         id: clipId,
-        role, emotion, text, language,
+        role, emotion, text, language, instruct, synthesis_mode, title: text.slice(0, 60),
         speaker: defSpeaker.value,
         signal: defSignal.value,
         delay: 0,
@@ -2133,12 +2427,19 @@
         generatedEmotion: null,
         generatedText: null,
         generatedLanguage: null,
-      });
+      };
+      const record = await (await apiRequest('/api/clips', {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({...clipMetadata(clip), position: clips.length})})).json();
+      applyRecord(clip, record);
+      clips.push(clip);
       genText.value = "";
       renderList();
 
-      enqueueJob({ clipId, role, emotion, text, language });
+      enqueueJob({ clipId, role, emotion, text, language, instruct, synthesis_mode, allow_download });
       setGenStatus("已加入队列", "ok");
+      } catch (error) { setGenStatus('保存失败：' + error.message, 'err'); }
+      finally { updateGeneratorMode(); }
     }
 
     // ============================================================
@@ -2146,9 +2447,47 @@
     // ============================================================
     playBtn.addEventListener("click", runPlaylist);
     stopBtn.addEventListener("click", stopPlaylist);
-    clearBtn.addEventListener("click", clearAll);
+    clearBtn.addEventListener("click", () => clearAll());
     genBtn.addEventListener("click", generateClip);
     genRole.addEventListener("change", onGeneratorRoleChange);
+    $('cloneTab').onclick = () => { generatorMode = 'clone'; updateGeneratorMode(); };
+    $('designTab').onclick = () => { generatorMode = 'design'; updateGeneratorMode(); };
+    for (const id of ['cloneTab', 'designTab']) {
+      $(id).onkeydown = event => {
+        if (['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+          event.preventDefault();
+          const next = id === 'cloneTab' ? $('designTab') : $('cloneTab');
+          next.click(); next.focus();
+        }
+      };
+    }
+    $('refreshLibrary').onclick = () => { loadLibrary(); loadPTList(); loadCapabilities(); };
+    $('librarySearch').oninput = renderList;
+    $('selectAll').onchange = event => {
+      for (const clip of visibleClips()) {
+        if (event.target.checked) selectedClips.add(clip.id); else selectedClips.delete(clip.id);
+      }
+      renderList();
+    };
+    $('exportSelected').onclick = () => exportClips(true);
+    $('exportAll').onclick = () => exportClips(false);
+    $('deleteSelected').onclick = () => clearAll(true);
+    $('cancelEdit').onclick = () => $('editDialog').close();
+    $('editForm').onsubmit = async event => {
+      event.preventDefault();
+      const clip = editingClip;
+      const previous = clipMetadata(clip);
+      const changes = {title: $('editTitle').value.trim(), text: $('editText').value,
+        language: $('editLanguage').value, instruct: clip.synthesis_mode === 'design' ? $('editInstruct').value.trim() : ''};
+      $('saveEdit').disabled = true;
+      try {
+        Object.assign(clip, changes);
+        await saveClip(clip);
+        $('editDialog').close();
+        renderList(); setStatus('修改已保存');
+      } catch (error) { Object.assign(clip, previous); $('editStatus').textContent = error.message; }
+      finally { $('saveEdit').disabled = false; }
+    };
 
     applySpeakerAll.addEventListener("click", applySpeakerToAll);
     applySignalAll.addEventListener("click", applySignalToAll);
@@ -2164,8 +2503,10 @@
     // ============================================================
     // 启动
     // ============================================================
-    renderList();
+    updateGeneratorMode();
+    loadLibrary();
     loadPTList();
+    loadCapabilities();
     setStatus("就绪");
   </script>
 

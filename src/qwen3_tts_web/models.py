@@ -22,18 +22,19 @@ def model_path(settings, key=None):
     return settings.root / "models" / MODELS[key or settings.model_key]
 
 
-def prepare_model(settings, log=print):
+def prepare_model(settings, log=print, key=None):
     """Keep downloader imports and online flags out of the inference process."""
-    target = model_path(settings)
-    if validate_model(target, settings.model_key) and not settings.offline:
+    key = key or settings.model_key
+    target = model_path(settings, key)
+    if validate_model(target, key) and not settings.offline:
         from .process import Runner
 
         Runner(log).run(
-            [sys.executable, "-m", "qwen3_tts_web", "download", "--yes"],
+            [sys.executable, "-m", "qwen3_tts_web", "download", "--yes", "--model-key", key],
             env=settings.environment(),
             cwd=settings.root,
         )
-    return ensure_model(replace(settings, offline=True), log=log)
+    return ensure_model(replace(settings, offline=True), key=key, log=log)
 
 
 def _json(path):

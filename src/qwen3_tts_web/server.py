@@ -13,22 +13,26 @@ pt 目录结构：
 
 import dataclasses
 import inspect
+import json
 import os
 import re
+import tempfile
 import threading
 import uuid
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Annotated, Any, Dict, List
+from typing import Annotated, Any, Dict, List, Literal
 
-import soundfile as sf
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, BeforeValidator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
+from starlette.background import BackgroundTask
 
 from .config import load_settings
+from .library import AudioLibrary
 from .runtime import free, load
 
 settings = load_settings()
@@ -60,16 +64,49 @@ def _find_prompt_item_cls():
 
 VOICE_CLONE_PROMPT_ITEM = None
 model = None
+active_model_key = settings.model_key
 inference_lock = threading.Lock()
+
+
+def get_model(key, allow_download=False):
+    """Caller holds inference_lock; keep only one inference model on the device."""
+    global model, active_model_key
+    from .models import model_path, prepare_model, validate_model
+
+    if model is not None and active_model_key == key:
+        return model
+    errors = validate_model(model_path(settings, key), key)
+    if errors and (settings.offline or not allow_download):
+        raise HTTPException(
+            409,
+            detail={
+                "message": "模型缺失或不完整；离线模式禁止下载"
+                if settings.offline
+                else "请先下载模型或确认本次下载",
+                "model_key": key,
+                "missing": errors,
+            },
+        )
+    # Prepare first: a failed download must not evict a working model.
+    prepare_model(settings, key=key)
+    app.state.ready = False
+    model = None
+    free()
+    model = load(settings, key=key)
+    active_model_key = key
+    app.state.ready = True
+    return model
 
 
 @asynccontextmanager
 async def lifespan(app):
-    global model, VOICE_CLONE_PROMPT_ITEM
+    global model, VOICE_CLONE_PROMPT_ITEM, active_model_key
     for directory in (PT_DIR, OUT_DIR, UPLOAD_DIR, BASE_DIR / "references"):
         directory.mkdir(parents=True, exist_ok=True)
     try:
         model = load(settings)
+        active_model_key = settings.model_key
+        AudioLibrary(OUT_DIR).list()
         VOICE_CLONE_PROMPT_ITEM, _ = _find_prompt_item_cls()
         app.state.ready = True
         yield
@@ -87,10 +124,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.state.ready = False
-app.mount(
-    "/static/audio", StaticFiles(directory=str(OUT_DIR), check_dir=False), name="audio"
-)
 app.mount("/web", StaticFiles(directory=str(WEB_DIR)), name="web")
+
+
+@app.get("/static/audio/{filename}", include_in_schema=False)
+def audio_file(filename: str):
+    try:
+        path = AudioLibrary(OUT_DIR).audio_path(filename)
+    except ValueError:
+        raise HTTPException(404, detail="音频不存在")
+    if not path.is_file():
+        raise HTTPException(404, detail="音频不存在")
+    return FileResponse(path, media_type="audio/wav")
 
 
 @app.get("/api/health", summary="模型就绪状态")
@@ -104,7 +149,7 @@ def api_health():
         {
             "ready": ready,
             "device": str(getattr(model, "device", settings.device)),
-            "model": MODELS[settings.model_key],
+            "model": MODELS[active_model_key],
         },
         status_code=200 if ready else 503,
     )
@@ -129,6 +174,147 @@ class TTSRequest(BaseModel):
     language: str = "Chinese"
     mode: str = "url"  # "url" | "file"
     pt_file: str = ""  # 兼容旧接口
+    clip_id: str | None = None
+
+
+class VoiceDesignRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=10000)
+    instruct: str = Field(min_length=1, max_length=2000)
+    language: str = "Chinese"
+    mode: Literal["url", "file"] = "url"
+    clip_id: str | None = None
+    allow_download: bool = False
+
+    @field_validator("text", "instruct")
+    @classmethod
+    def nonblank(cls, value):
+        if not value.strip():
+            raise ValueError("文本与音色描述不能为空")
+        return value.strip()
+
+
+class ClipEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    title: str = Field(default="", max_length=200)
+    text: str = Field(default="", max_length=10000)
+    role: str = Field(default="", max_length=200)
+    emotion: Emotion = "平静"
+    language: str = Field(default="Chinese", max_length=40)
+    synthesis_mode: Literal["clone", "design", "legacy"] = "clone"
+    instruct: str = Field(default="", max_length=2000)
+    speaker: Literal["raw", "clean", "radio", "dirty", "broken", "destroyed"] = "raw"
+    signal: Literal["raw", "strong", "normal", "weak", "critical"] = "raw"
+    delay: float = Field(default=0, ge=0, le=3600)
+    position: float = Field(default=0, ge=0)
+
+
+class ExportRequest(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=1000)
+
+
+def library_record(clip_id):
+    try:
+        return AudioLibrary(OUT_DIR).get(clip_id)
+    except KeyError:
+        raise HTTPException(404, detail="音频记录不存在")
+
+
+@app.get("/api/clips")
+def list_clips():
+    return {"clips": AudioLibrary(OUT_DIR).list()}
+
+
+@app.post("/api/clips", status_code=201)
+def create_clip(req: ClipEdit):
+    return AudioLibrary(OUT_DIR).create(req.model_dump())
+
+
+@app.get("/api/clips/{clip_id}")
+def read_clip(clip_id: str):
+    return library_record(clip_id)
+
+
+@app.patch("/api/clips/{clip_id}")
+def update_clip(clip_id: str, req: ClipEdit):
+    try:
+        return AudioLibrary(OUT_DIR).update(clip_id, req.model_dump(exclude_unset=True))
+    except KeyError:
+        raise HTTPException(404, detail="音频记录不存在")
+
+
+@app.delete("/api/clips/{clip_id}")
+def delete_clip(clip_id: str):
+    try:
+        AudioLibrary(OUT_DIR).delete(clip_id)
+    except KeyError:
+        raise HTTPException(404, detail="音频记录不存在")
+    return {"status": "ok"}
+
+
+def export_name(record):
+    title = re.sub(
+        r'[\x00-\x1f<>:"/\\|?*]',
+        "_",
+        record.get("title") or record.get("text") or "audio",
+    )
+    return f"{title[:80].strip('. ') or 'audio'}-{record['id'][:8]}.wav"
+
+
+@app.get("/api/clips/{clip_id}/download")
+def download_clip(clip_id: str):
+    record = library_record(clip_id)
+    if not record["available"]:
+        raise HTTPException(404, detail="音频文件不存在")
+    return FileResponse(
+        AudioLibrary(OUT_DIR).audio_path(record["filename"]),
+        media_type="audio/wav",
+        filename=export_name(record),
+    )
+
+
+@app.post("/api/clips/export")
+def export_clips(req: ExportRequest):
+    library = AudioLibrary(OUT_DIR)
+    with library.lock:
+        records = [library_record(key) for key in dict.fromkeys(req.ids)]
+        if any(not record["available"] for record in records):
+            raise HTTPException(409, detail="所选记录包含缺失的音频，请刷新列表")
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as handle:
+            target = Path(handle.name)
+        try:
+            with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
+                for index, record in enumerate(records, 1):
+                    archive.write(
+                        library.audio_path(record["filename"]),
+                        f"{index:03d}-{export_name(record)}",
+                    )
+                archive.writestr(
+                    "manifest.json", json.dumps(records, ensure_ascii=False, indent=2)
+                )
+        except BaseException:
+            target.unlink(missing_ok=True)
+            raise
+    return FileResponse(
+        target,
+        filename="qwen3-tts-audio.zip",
+        media_type="application/zip",
+        background=BackgroundTask(target.unlink, missing_ok=True),
+    )
+
+
+@app.get("/api/capabilities")
+def capabilities():
+    from .models import MODELS, model_path, validate_model
+
+    errors = validate_model(model_path(settings, "voicedesign"), "voicedesign")
+    return {
+        "voice_design": {
+            "model": MODELS["voicedesign"],
+            "installed": not errors,
+            "offline": settings.offline,
+        },
+        "active_model": MODELS[active_model_key],
+    }
 
 
 class PromptCreateRequest(BaseModel):
@@ -345,7 +531,9 @@ def api_pt_create(req: PromptCreateRequest):
 
     try:
         with inference_lock:
-            prompt = model.create_voice_clone_prompt(**kwargs)
+            prompt = get_model(settings.model_key).create_voice_clone_prompt(**kwargs)
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
 
@@ -422,6 +610,10 @@ def api_pt_inspect(role: str = "", emotion: str = "平静", name: str = ""):
 # ================= API：TTS =================
 @app.post("/api/tts", summary="生成语音（role+emotion 或 pt_file）")
 def api_tts(req: TTSRequest):
+    if not req.text.strip():
+        raise HTTPException(400, detail="文本不能为空")
+    if req.clip_id:
+        library_record(req.clip_id)
     if req.mode not in ("file", "url"):
         raise HTTPException(400, detail="mode 必须是 'file' 或 'url'")
     # 定位 .pt
@@ -441,38 +633,81 @@ def api_tts(req: TTSRequest):
 
     try:
         with inference_lock:
-            wavs, sr = model.generate_voice_clone(
+            wavs, sr = get_model(settings.model_key).generate_voice_clone(
                 text=req.text,
                 language=req.language,
                 voice_clone_prompt=prompt_list,
             )
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
 
         traceback.print_exc()
         raise HTTPException(500, detail=f"生成失败: {e}")
 
-    fname = f"{uuid.uuid4().hex}.wav"
-    out_path = OUT_DIR / fname
+    generated = {
+        "role": req.role,
+        "emotion": req.emotion,
+        "text": req.text,
+        "language": req.language,
+        "synthesis_mode": "clone",
+        "instruct": "",
+    }
+    return save_generation(req, wavs, sr, generated)
+
+
+def save_generation(req, wavs, sr, generated):
+    metadata = {"generated": generated}
+    if not req.clip_id:
+        metadata.update(generated, title=req.text[:60])
     try:
-        sf.write(str(out_path), wavs[0], sr)
+        record = AudioLibrary(OUT_DIR).save_audio(wavs[0], sr, metadata, req.clip_id)
+    except KeyError:
+        raise HTTPException(404, detail="记录已被删除，本次生成结果未保存")
     except Exception as e:
         raise HTTPException(500, detail=f"保存音频失败: {e}")
-
+    fname = record["filename"]
+    out_path = OUT_DIR / fname
     if req.mode == "file":
         return FileResponse(str(out_path), media_type="audio/wav", filename=fname)
+    return {
+        "status": "ok",
+        "filename": fname,
+        "url": record["url"],
+        "local_path": str(out_path),
+        "role": generated.get("role", ""),
+        "emotion": generated.get("emotion", "平静"),
+        "clip": record,
+    }
 
-    if req.mode == "url":
-        return {
-            "status": "ok",
-            "filename": fname,
-            "url": f"/static/audio/{fname}",
-            "local_path": str(out_path),
-            "role": req.role,
-            "emotion": req.emotion,
-        }
 
-    raise HTTPException(400, detail="mode 必须是 'file' 或 'url'")
+@app.post("/api/voice-design", summary="通过自然语言描述设计音色并生成语音")
+def api_voice_design(req: VoiceDesignRequest):
+    if req.clip_id:
+        library_record(req.clip_id)
+    try:
+        with inference_lock:
+            wavs, sr = get_model(
+                "voicedesign", req.allow_download
+            ).generate_voice_design(
+                text=req.text,
+                language=req.language,
+                instruct=req.instruct,
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(500, detail=f"音色设计失败: {exc}")
+    generated = {
+        "text": req.text,
+        "language": req.language,
+        "instruct": req.instruct,
+        "synthesis_mode": "design",
+        "role": "",
+        "emotion": "平静",
+    }
+    return save_generation(req, wavs, sr, generated)
 
 
 # ================= 上传 & maker 页面 =================

@@ -1,97 +1,186 @@
-# Qwen3-TTS Voice Clone API
+<div align="center">
 
-本地语音克隆服务，按「角色 / 情感」管理音色，提供 Web 台词编辑器、音色打包器、HTTP API 与中文 TUI。支持 Windows / Linux NVIDIA CUDA 和 macOS Apple Silicon MPS。
+# Qwen3-TTS Web
 
-## 跨平台快捷入口
+**在电脑上运行的本地语音工作台**
 
-克隆项目后，在项目目录执行一行命令进入 TUI：
+角色克隆 · Prompt 音色设计 · 本地语音库 · 批量导出 · 中文 TUI
 
-| 平台 | 命令 |
-| --- | --- |
-| macOS Apple Silicon | `bash scripts/bootstrap.sh` |
-| Linux NVIDIA | `bash scripts/bootstrap.sh` |
-| Windows PowerShell | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1` |
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
+![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-000000?logo=apple&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-NVIDIA_CUDA-76B900?logo=nvidia&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-NVIDIA_CUDA-76B900?logo=linux&logoColor=white)
+![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
 
-首次运行会先询问是否安装轻量管理工具及 Python 3.11。进入 TUI 后选择「安装 / 修复」，确认后安装推理依赖并自动下载当前 Base 模型；然后选择「启动服务」。不需要手动激活虚拟环境，也不要求预先安装 Python。
+[快速开始](#快速开始) · [常用命令](#常用命令) · [功能与使用](#功能与使用) · [运行要求](#运行要求) · [接口文档](docs/audio-library.md)
 
-引导程序不自动安装 Homebrew / Scoop 或修改全局镜像配置。安装系统音频工具需要单独勾选并确认。原生 arm64 Python 用于 Apple Silicon；Intel Mac、纯 CPU、AMD GPU 和 MLX 不在本版本支持范围。
+</div>
 
-### 无界面命令
+## 快速开始
 
-macOS / Linux：
+**支持 macOS Apple Silicon，以及 Windows / Linux 的 NVIDIA 显卡。** 不需要提前创建虚拟环境；引导脚本会检查 Python 3.11，并在确认后安装缺失工具。
+
+### 1. 获取项目
 
 ```bash
-bash scripts/bootstrap.sh doctor
-bash scripts/bootstrap.sh setup
-bash scripts/bootstrap.sh download
-bash scripts/bootstrap.sh serve
+git clone --branch feat-ui https://github.com/JilinJL/qwen3-tts-base-web.git
+cd qwen3-tts-base-web
 ```
 
-Windows PowerShell：
+已有项目时，直接在项目目录执行下面的命令。
+
+### 2. 安装并启动
+
+**macOS / Linux**
+
+```bash
+# 首次安装依赖并下载 Base 模型
+bash scripts/bootstrap.sh setup
+
+# 启动服务，仅允许本机访问
+bash scripts/bootstrap.sh serve --host 127.0.0.1
+```
+
+**Windows PowerShell**
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 doctor
+# 首次安装依赖并下载 Base 模型
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 setup
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 download
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 serve
+
+# 启动服务，仅允许本机访问
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 serve --host 127.0.0.1
 ```
 
-以上入口支持相同参数：`--yes` 用于无人值守确认安装/下载，`--offline` 禁止下载，`--model 0.6B` 切换轻量 Base，`--device mps` 或 `--device cuda:0` 指定设备，`--source official` 使用官方源。管理工具安装完成后也可使用其中的 `qwen3-tts-web` 命令。
+### 3. 打开工作台
 
-`doctor` 仅检查环境并返回状态码，不修复、不下载模型。首次使用引导脚本时，仍需先安装管理工具；已有工具的后续检查不联网。非交互终端应明确指定子命令。
+浏览器访问 **[http://localhost:8001](http://localhost:8001)**。服务不会自动打开浏览器。
 
-## 启动后
+> **更喜欢菜单操作？** macOS / Linux 执行 `bash scripts/bootstrap.sh`；Windows 执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1`。进入中文 TUI 后选择「安装 / 修复」，完成后选择「启动服务」。
 
-| 地址 | 页面 |
+## 常用命令
+
+`setup` 已包含默认模型下载，日常只需 `serve`。以下子命令可接在两个平台入口之后：
+
+| 操作 | 子命令 |
 | --- | --- |
-| `http://localhost:8001/` | 角色台词编辑器 |
-| `http://localhost:8001/maker` | 音色打包器 |
-| `http://localhost:8001/docs` | API 文档 |
-| `http://localhost:8001/api/health` | 模型就绪状态 |
+| 环境检查，不安装 | `doctor` |
+| 安装 / 修复依赖与默认模型 | `setup` |
+| 下载默认 Base 模型 | `download` |
+| 下载描述音色模型 | `download --model-key voicedesign` |
+| 启动本机服务 | `serve --host 127.0.0.1` |
+| 离线启动 | `serve --offline --host 127.0.0.1` |
 
-**安全提示：** 为兼容旧版本，默认监听 `0.0.0.0:8001`，无身份认证。仅本机使用请加 `--host 127.0.0.1`。不要将服务直接暴露到公网；只加载可信来源的 `.pt` 文件，PyTorch pickle 文件可以执行代码。
+<details>
+<summary><strong>完整命令示例与可选参数</strong></summary>
 
-## 环境与模型
+```bash
+# macOS / Linux
+bash scripts/bootstrap.sh doctor
+bash scripts/bootstrap.sh download --model-key voicedesign
+bash scripts/bootstrap.sh serve --offline --host 127.0.0.1
+```
 
-- Python 3.11；引导程序优先复用可用解释器，否则经确认通过 uv 获取。
-- NVIDIA：默认 1.7B 至少 6 GiB 显存，0.6B 至少 4 GiB；安装前检查选定 GPU，安装后实际执行设备计算自检。当前固定分支不覆盖所有新旧显卡，详细范围见部署文档。
-- Apple Silicon：使用 MPS、`float32` 与 `sdpa`；建议 24 GiB 统一内存，并留出足够可用内存。内存不足时提示切换 0.6B，不静默切换模型或 CPU。
-- 首次部署建议至少 10 GiB 可用磁盘；Base 1.7B 完整模型约 4.6 GB，下载速度取决于网络。
-- 默认只下载 Base 完整快照，包含其内嵌 `speech_tokenizer/`。其他模型可在 TUI「模型」页按需下载，下载不代表新增对应 Web 推理功能。
-- 国内源优先并提供官方回退；完整模型存在时直接复用。模型加载在本地离线完成，不会因为缺失文件悄悄访问其他仓库。
-- 不默认安装 FlashAttention；环境不支持指定设备时明确报错，不自动回退 CPU。
+```powershell
+# Windows PowerShell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 doctor
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 download --model-key voicedesign
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 serve --offline --host 127.0.0.1
+```
+
+| 参数 | 用途 |
+| --- | --- |
+| `--model 0.6B` | 使用较小的 Base；VoiceDesign 仍为 1.7B |
+| `--device mps` / `--device cuda:0` | 指定推理设备 |
+| `--port 8002` | 更换端口 |
+| `--source official` | 使用官方源 |
+| `--yes` | 自动确认安装 / 下载，适用于无人值守 |
+
+管理环境准备完成后，也可使用该环境中的 `qwen3-tts-web` 命令。`doctor` 只检查；首次执行引导脚本时，若管理环境缺失，仍需先确认安装管理工具。
+
+</details>
+
+## 功能与使用
+
+| 功能 | 操作入口 | 结果 |
+| --- | --- | --- |
+| 角色克隆 | 「克隆音色」上传参考音频，创建 `.pt`；回到「角色音色」输入台词 | 使用保存的角色音色合成，情绪默认「平静」 |
+| Prompt 音色设计 | 「描述音色」填写提示词与台词 | 独立 VoiceDesign 模型生成，无需参考音频 |
+| 本地语音库 | 工作台列表 | 刷新 / 重启后恢复，支持搜索、改名、编辑、重新生成与删除 |
+| 导出音频 | 单条下载，或勾选后批量导出 | 原始 WAV；批量 ZIP 包含音频与参数清单 |
+| 部署管理 | 中文 TUI | 环境检查、依赖修复、模型下载、服务启停与日志 |
+
+**音色描述示例：**「年轻女性，温暖清晰的中音，语速舒缓，带自然的微笑感。」
+
+首次使用「描述音色」时，确认后下载 VoiceDesign 1.7B。Base 与 VoiceDesign 按需切换，设备上只保留一个推理模型，切换需要时间；离线模式不下载缺失模型。`.pt` 角色属于 Base 克隆提示文件，不是上游 CustomVoice 的内置说话人。CustomVoice 目前仅支持下载，尚未接入推理接口。
+
+### 本地数据
+
+- WAV 和 `output/library.sqlite3` 共同组成语音库；备份时先停止服务，再备份整个 `output/`。
+- 旧 `output/*.wav` 自动纳入列表，不移动文件；旧版未保存的台词和角色信息无法恢复。
+- 编辑参数不会修改已有音频；重新生成成功后才替换旧 WAV，失败则保留旧音频。
+- 删除需确认，会同时删除记录和对应文件。
+- 设备 / 信号音效仅用于浏览器播放，不包含在导出的原始 WAV 中。
+
+## 运行要求
+
+| 平台 | 推理方式 | 建议与限制 |
+| --- | --- | --- |
+| macOS Apple Silicon | MPS，`float32 + sdpa` | 原生 arm64 Python；建议 24 GiB 统一内存 |
+| Windows / Linux NVIDIA | CUDA，按设备选择精度 | 默认 1.7B 至少 6 GiB 显存，Base 0.6B 至少 4 GiB；安装时检查兼容性 |
+| 通用 | Python 3.11 | 首次部署建议至少 10 GiB 空闲磁盘；VoiceDesign 需额外空间 |
+
+不承诺 Intel Mac、纯 CPU、AMD GPU 或 MLX 支持，不静默回退 CPU，不默认安装 FlashAttention。
+
+默认下载完整 Base 模型（含内嵌语音 tokenizer，1.7B 约 4.6 GB）。国内源优先、官方源回退，完整模型直接复用。系统音频工具需单独确认安装，不自动安装系统包管理器、不修改全局镜像配置。
+
+## 配置与安全
+
+配置示例见 [config.example.toml](config.example.toml)。项目根目录的 `config.toml` 支持设备、Base 规格、下载源、监听地址和端口。
+
+**优先级：命令行 > `QWEN3_TTS_*` 环境变量 > `config.toml` > 默认值。**
+
+| 地址 | 用途 |
+| --- | --- |
+| `/` | 语音工作台与本地语音库 |
+| `/maker` | 参考音频与克隆角色管理 |
+| `/docs` | 交互式 HTTP API 文档 |
+| `/api/health` | 模型就绪状态与设备 |
+
+> **安全提示：** 默认监听 `0.0.0.0:8001`，无身份认证，同一局域网内其他设备可能访问并修改数据。仅本机使用请保留快捷命令中的 `--host 127.0.0.1`，不要直接暴露到公网。只加载可信 `.pt` 文件，PyTorch pickle 文件可以执行代码。
 
 ## 项目结构
 
 ```text
 .
 ├── pyproject.toml             # 包元数据、依赖与 CLI
-├── config.example.toml        # 项目级配置示例
-├── main.py                    # 旧 uvicorn main:app 兼容入口
-├── src/qwen3_tts_web/         # 服务、运行时、管理工具、TUI
+├── config.example.toml        # 配置示例
+├── main.py                    # uvicorn main:app 兼容入口
+├── src/qwen3_tts_web/         # 服务、运行时、CLI、TUI
 │   ├── constraints/           # macOS / CUDA 固定依赖分支
-│   └── web/                   # 随包发布的原有 Web 页面
+│   └── web/                   # 桌面 Web 界面
 ├── scripts/                   # 跨平台引导与启动脚本
-├── tests/                     # 无硬件回归与可选真机测试
-├── docs/                      # 部署、API、开发文档
-├── .github/workflows/         # Windows / macOS / Linux CI
+├── tests/                     # API 与桌面浏览器回归
+├── docs/                      # 语音库与 VoiceDesign 接口说明
 ├── models/                    # 模型，不提交
-├── pt/                        # 原有角色 / 情感音色，不提交
+├── pt/                        # 角色音色，不提交
 ├── uploads/                   # 上传音频，不提交
 ├── references/                # 参考音频，不提交
-└── output/                    # 合成结果，不提交
+└── output/                    # WAV 与 SQLite 语音库，不提交
 ```
 
-管理工具使用 `.venv-tools/`，推理服务使用 `.venv/`；TUI 日志保存在 `.logs/manager.log`，自动轮转。旧 `models/`、`pt/` 等目录不迁移、不删除；旧 `outputs/` 保留，新输出统一到 `output/`。
+管理环境为 `.venv-tools/`，推理环境为 `.venv/`，日志位于 `.logs/`。旧数据目录不迁移、不删除，新音频统一写入 `output/`。
 
-## 文档
+## 开发与文档
 
-- [部署、配置与故障排查](docs/deployment.md)
-- [API 与音色格式](docs/api.md)
-- [开发、测试与真机验收](docs/development.md)
-- [本次平台验收记录](docs/validation.md)
-- [贡献指南](CONTRIBUTING.md)
+- [语音库 CRUD、批量导出与 VoiceDesign API](docs/audio-library.md)
+- [依赖、打包与测试配置](pyproject.toml)
+- [配置项示例](config.example.toml)
+
+Python 测试使用模拟模型与临时目录，不要求 GPU；桌面浏览器回归使用 Playwright。运行方式见 [测试说明](docs/audio-library.md#验证)。模拟测试不替代 VoiceDesign 的真实 MPS / CUDA 验收。
 
 ## 许可与致谢
 
-本项目使用 MIT 许可证，见 [LICENSE](LICENSE)。Qwen3-TTS 上游代码及模型使用各自声明的许可证，分发时保留上游署名与许可文件。感谢 Qwen3-TTS、PyTorch、ModelScope、FastAPI 与 Textual 社区。
+本项目使用 [MIT License](LICENSE)。上游代码及模型遵循各自许可证，分发时保留署名与许可文件。
+
+感谢 [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)、PyTorch、ModelScope、FastAPI 与 Textual 社区。
