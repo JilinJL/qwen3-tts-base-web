@@ -24,7 +24,7 @@
 ### 1. 获取项目
 
 ```bash
-git clone --branch feat-ui https://github.com/NOTF-API/qwen3-tts-base-web.git
+git clone https://github.com/NOTF-API/qwen3-tts-base-web.git
 cd qwen3-tts-base-web
 ```
 
