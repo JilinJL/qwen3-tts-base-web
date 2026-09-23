@@ -1,5 +1,18 @@
 # Python
 .venv/
+.venv-tools/
+.venv-test/
+.pytest_cache/
+.logs/
+.setup.lock
+.runtime.lock
+config.toml
+config.toml.tmp
+build/
+dist/
+*.egg-info/
+.coverage
+htmlcov/
 __pycache__/
 *.py[cod]
 

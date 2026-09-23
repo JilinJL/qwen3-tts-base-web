@@ -20,7 +20,7 @@
             padding: 40px 16px 80px;
             font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
             color: #ddd;
-            background: radial-gradient(circle at 50% 15%, #2a2d32 0, #17191c 45%, #08090a 100%);
+            background: #101214;
         }
 
         .app {
@@ -35,13 +35,13 @@
             margin: 0 0 6px;
             font-size: 18px;
             color: #eee;
-            letter-spacing: 0.5px;
+            letter-spacing: 0;
         }
 
         .header p {
             margin: 0;
             font-size: 12px;
-            color: #666;
+            color: #92999f;
             line-height: 1.7;
         }
 
@@ -82,25 +82,22 @@
         }
 
         .card {
-            background: #111316;
-            border: 1px solid #2a2d31;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 10px 30px #0008;
+            border-top: 1px solid #2a2d31;
+            padding: 20px 0 4px;
         }
 
         .card h2 {
             margin: 0 0 12px;
-            font-size: 11px;
+            font-size: 13px;
             color: #72e68a;
-            letter-spacing: 2px;
+            letter-spacing: 0;
             text-transform: uppercase;
             font-weight: 600;
         }
 
         .hint {
             font-size: 11px;
-            color: #666;
+            color: #92999f;
             line-height: 1.6;
             margin: 4px 0 0;
         }
@@ -120,7 +117,7 @@
         /* ---------- 拖放区 ---------- */
         .drop {
             border: 2px dashed #333;
-            border-radius: 10px;
+            border-radius: 8px;
             padding: 26px 20px;
             text-align: center;
             cursor: pointer;
@@ -165,7 +162,7 @@
             padding: 12px;
             background: #0a0c0e;
             border: 1px solid #1d2023;
-            border-radius: 10px;
+            border-radius: 8px;
         }
 
         .wave-box.show {
@@ -218,7 +215,7 @@
             padding: 2px 8px;
             margin-bottom: 10px;
             font: 10px monospace;
-            letter-spacing: 1px;
+            letter-spacing: 0;
             border-radius: 4px;
             text-transform: uppercase;
         }
@@ -398,7 +395,7 @@
             font-size: 11px;
             color: #888;
             margin-bottom: 5px;
-            letter-spacing: 0.3px;
+            letter-spacing: 0;
         }
 
         label.field .req {
@@ -459,11 +456,11 @@
             padding: 14px;
             font-size: 14px;
             font-weight: 600;
-            letter-spacing: 1px;
+            letter-spacing: 0;
             color: #0b1f0f;
             background: #72e68a;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             cursor: pointer;
             box-shadow: 0 8px 24px #72e68a33;
             transition: background .15s, transform .1s;
@@ -543,6 +540,10 @@
             .row {
                 grid-template-columns: 1fr;
             }
+            body { padding: 24px 16px 40px; }
+            .header-top { flex-wrap: wrap; }
+            .sel-info { min-width: 0; }
+            .sel-btns { flex-wrap: wrap; }
         }
     </style>
 </head>
@@ -552,8 +553,8 @@
 
         <header class="header">
             <div class="header-top">
-                <h1>🎙️ 音色打包器</h1>
-                <a class="nav-link" href="/" target="_blank" rel="noopener">📢 语音合成 ↗</a>
+                <h1>音色打包器</h1>
+                <a class="nav-link" href="/">语音合成</a>
             </div>
             <p>
                 上传参考音频 → <b>裁切并确认</b> → 填写文本 → 打包成 <code>.pt</code>，存到
@@ -596,7 +597,7 @@
                     <div class="sel-btns">
                         <button class="sel-btn" id="previewBtn" disabled>▶ 试听</button>
                         <button class="sel-btn" id="resetBtn" disabled>用全段</button>
-                        <button class="sel-btn confirm" id="confirmBtn" disabled>✅ 确认裁切</button>
+                        <button class="sel-btn confirm" id="confirmBtn" disabled>确认裁切</button>
                         <button class="sel-btn edit" id="editBtn" style="display:none;">↩ 重新裁切</button>
                     </div>
                 </div>
@@ -623,12 +624,12 @@
             <h2>02 · 音色信息</h2>
             <div class="row">
                 <div>
-                    <label class="field">角色名 <span class="req">*</span></label>
+                    <label class="field" for="role">角色名 <span class="req">*</span></label>
                     <input type="text" id="role" placeholder="例如：张三" maxlength="30">
                 </div>
                 <div>
-                    <label class="field">情感名 <span class="req">*</span></label>
-                    <input type="text" id="emotion" placeholder="例如：平静 / 愤怒" maxlength="30">
+                    <label class="field" for="emotion">情绪 <span class="opt">（选填，默认平静）</span></label>
+                    <input type="text" id="emotion" placeholder="平静" maxlength="30">
                 </div>
             </div>
             <label class="field">
@@ -637,7 +638,7 @@
             <textarea id="refText"
                 placeholder="必须与音频内容一字不差，否则音色会偏。&#10;若留空，会用 x-vector only 模式：不需要文本，但音色还原度会下降。"></textarea>
             <p class="hint warn" id="xvecHint" style="display:none;">
-                ⚠️ 未填参考文本 → 将使用 <code>x_vector_only_mode</code>，音色会明显偏离原声。
+                未填参考文本，将使用 <code>x_vector_only_mode</code>。
             </p>
             <label class="check">
                 <input type="checkbox" id="overwrite">
@@ -1281,7 +1282,7 @@
 
             // 只有锁定后才允许提交
             submitBtn.disabled = !(hasAudio && cropLocked &&
-                roleInput.value.trim() && emotionInput.value.trim());
+                roleInput.value.trim());
         }
 
         roleInput.addEventListener("input", updateButtons);
@@ -1307,11 +1308,11 @@
 
         submitBtn.addEventListener("click", async () => {
             const role = roleInput.value.trim();
-            const emotion = emotionInput.value.trim();
+            const emotion = emotionInput.value.trim() || "平静";
             const refText = refTextInput.value.trim();
             const overwrite = overwriteInput.checked;
 
-            if (!cropLocked) { setStatus("请先确认裁切（点击「✅ 确认裁切」）", "err"); return; }
+            if (!cropLocked) { setStatus("请先确认裁切", "err"); return; }
             if (!validName(role)) { setStatus("角色名只能包含字母/数字/中文/下划线/横线，1-30 字符", "err"); return; }
             if (!validName(emotion)) { setStatus("情感名只能包含字母/数字/中文/下划线/横线，1-30 字符", "err"); return; }
             if (!audioBuffer) { setStatus("请先上传音频", "err"); return; }
@@ -1370,7 +1371,7 @@
                 if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
 
                 setStatus(
-                    "✅ 生成成功\n" +
+                    "生成成功\n" +
                     "────────────────────\n" +
                     "音色      : " + data.role + " / " + data.emotion + "\n" +
                     "保存路径  : " + data.rel + "\n" +
