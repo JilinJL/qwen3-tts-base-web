@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qwen3-tts-web"
+version = "3.0.0"
+description = "Cross-platform local Qwen3-TTS voice cloning API and terminal manager"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+  "textual>=1.0,<2", "tomli-w>=1.2,<2", "psutil>=6,<8",
+  "filelock>=3.16,<4", "huggingface-hub>=0.34,<1",
+  "modelscope>=1.22,<2", "uv>=0.6,<1",
+]
+
+[project.optional-dependencies]
+server = [
+  "torch", "torchaudio", "torchvision",
+  "qwen-tts==0.1.1", "transformers==4.57.3", "accelerate==1.12.0",
+  "fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1",
+  "pydantic>=2.10,<3", "python-multipart>=0.0.20,<1",
+  "soundfile>=0.13,<1", "numpy>=1.26,<3",
+]
+test = [
+  "pytest>=8,<9", "pytest-asyncio>=0.25,<1", "httpx>=0.28,<1",
+  "fastapi>=0.115,<1", "python-multipart>=0.0.20,<1",
+  "soundfile>=0.13,<1", "numpy>=1.26,<3", "build>=1.2,<2",
+]
+
+[project.scripts]
+qwen3-tts-web = "qwen3_tts_web.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+qwen3_tts_web = ["web/*.html", "constraints/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["hardware: requires a real GPU, installed runtime and local model"]

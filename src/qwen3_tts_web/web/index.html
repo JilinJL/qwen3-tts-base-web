@@ -29,10 +29,11 @@
     /* ============ 顶部 ============ */
     header {
       flex: 0 0 auto;
-      height: 46px;
+      min-height: 46px;
+      flex-wrap: wrap;
       display: flex;
       align-items: center;
-      padding: 0 14px;
+      padding: 8px 14px;
       gap: 10px;
       background: #111418;
       border-bottom: 1px solid #1e2126;
@@ -52,19 +53,30 @@
       font-size: 13px;
       font-weight: 700;
       color: #e6ebf0;
-      letter-spacing: .5px;
+      letter-spacing: 0;
     }
 
     .brand .subtitle {
       font-size: 10px;
-      color: #586069;
-      letter-spacing: 1px;
+      color: #9099a3;
+      letter-spacing: 0;
       text-transform: uppercase;
     }
 
     .spacer {
       flex: 1;
     }
+
+    .nav-link {
+      color: #72e68a;
+      font-size: 12px;
+      text-decoration: none;
+      white-space: nowrap;
+      padding: 6px 0;
+    }
+
+    .nav-link:hover { color: #b1f4bf; }
+    :focus-visible { outline: 2px solid #72e68a; outline-offset: 3px; }
 
     .queue-indicator {
       font: 10px monospace;
@@ -150,9 +162,10 @@
 
     main {
       flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow: auto;
     }
 
     footer {
@@ -185,18 +198,16 @@
 
     /* ============ 侧栏卡片 ============ */
     .card {
-      background: #14171c;
-      border: 1px solid #1e2228;
-      border-radius: 8px;
-      padding: 10px 12px;
+      border-bottom: 1px solid #272c32;
+      padding: 4px 4px 16px;
     }
 
     .card h3 {
       margin: 0 0 10px 0;
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 700;
-      color: #6a737d;
-      letter-spacing: 1.2px;
+      color: #a5afb9;
+      letter-spacing: 0;
       text-transform: uppercase;
       display: flex;
       justify-content: space-between;
@@ -224,7 +235,7 @@
       margin-bottom: 4px;
       font-size: 10px;
       color: #586069;
-      letter-spacing: .5px;
+      letter-spacing: 0;
     }
 
     .grid-2 {
@@ -370,6 +381,8 @@
       align-items: center;
     }
 
+    .list-header, .list { min-width: 840px; }
+
     .list-header {
       flex: 0 0 auto;
       padding: 6px 10px;
@@ -377,7 +390,7 @@
       border-bottom: 1px solid #1e2126;
       font: 10px monospace;
       color: #586069;
-      letter-spacing: .5px;
+      letter-spacing: 0;
       text-transform: uppercase;
     }
 
@@ -476,7 +489,7 @@
       color: #3a4048;
       cursor: grab;
       user-select: none;
-      letter-spacing: -2px;
+      letter-spacing: 0;
       padding: 2px 0;
     }
 
@@ -668,7 +681,7 @@
       top: 50%;
       transform: translateY(-50%);
       font: 9px monospace;
-      letter-spacing: .5px;
+      letter-spacing: 0;
       padding: 2px 6px;
       border-radius: 3px;
       pointer-events: none;
@@ -686,6 +699,20 @@
       color: #e6b800;
       background: rgba(230, 184, 0, .15);
     }
+    @media (max-width: 720px) {
+      html, body { height: auto; min-height: 100%; }
+      body { overflow: auto; }
+      header { gap: 8px; }
+      .brand { flex-wrap: wrap; }
+      .brand .subtitle { display: none; }
+      .layout { flex-direction: column; overflow: visible; }
+      aside { flex: none; border-right: 0; border-bottom: 1px solid #272c32; }
+      main { flex: none; min-height: 300px; }
+      .list { flex: none; min-height: 250px; overflow: visible; }
+      footer { height: auto; min-height: 36px; flex-wrap: wrap; padding: 8px 14px; gap: 8px; }
+      footer .stat { min-width: 0; }
+      #statusText { overflow-wrap: anywhere; }
+    }
   </style>
 </head>
 
@@ -693,11 +720,11 @@
 
   <header>
     <div class="brand">
-      <span class="logo">🎙</span>
       <span class="title">Qwen3-TTS</span>
       <span class="subtitle">角色台词编辑器</span>
     </div>
     <div class="spacer"></div>
+    <a class="nav-link" href="/maker">音色打包器</a>
     <span class="queue-indicator" id="queueIndicator"></span>
     <button class="tool-btn primary" id="playBtn" disabled>▶ 播放全部</button>
     <button class="tool-btn" id="stopBtn" disabled>■ 停止</button>
@@ -712,25 +739,25 @@
       <section class="card">
         <h3>新建台词 <span class="badge" id="ptHint">加载中…</span></h3>
         <div class="field">
-          <label>谁（角色）</label>
+          <label for="genRole">角色</label>
           <select id="genRole"></select>
         </div>
         <div class="field">
-          <label>用什么感情</label>
+          <label for="genEmotion">情绪（选填）</label>
           <select id="genEmotion"></select>
         </div>
         <div class="field">
-          <label>语言</label>
+          <label for="genLanguage">语言</label>
           <select id="genLanguage">
-            <option>Chinese</option>
-            <option>English</option>
-            <option>Japanese</option>
-            <option>Korean</option>
-            <option>Auto</option>
+            <option value="Chinese" lang="zh">中文</option>
+            <option value="English" lang="en">English</option>
+            <option value="Japanese" lang="ja">日本語</option>
+            <option value="Korean" lang="ko">한국어</option>
+            <option value="Auto">自动检测</option>
           </select>
         </div>
         <div class="field">
-          <label>说了什么话（Ctrl+Enter 入队）</label>
+          <label for="genText">台词</label>
           <textarea id="genText" placeholder="输入台词…"></textarea>
         </div>
         <button class="btn primary" id="genBtn">+ 加入生成队列</button>
@@ -798,9 +825,9 @@
       <div class="list-header">
         <div></div>
         <div class="hdr">#</div>
-        <div class="hdr left">谁</div>
-        <div class="hdr left">感情</div>
-        <div class="hdr left">说了什么</div>
+        <div class="hdr left">角色</div>
+        <div class="hdr left">情绪</div>
+        <div class="hdr left">台词</div>
         <div class="hdr">设备</div>
         <div class="hdr">信号</div>
         <div class="hdr">延迟</div>
@@ -1765,7 +1792,7 @@
         rebuildEmotionSelect(emoEl, clip.role, clip.emotion);
         const emos = rolesData[clip.role] || [];
         if (!emos.includes(clip.emotion) && emos.length > 0) {
-          clip.emotion = emos[0];
+          clip.emotion = emos.includes("平静") ? "平静" : emos[0];
           emoEl.value = clip.emotion;
         }
         applyRoleColorVars(row, clip.role);
@@ -1851,7 +1878,7 @@
         const t = (clip.text || "").trim();
         if (!t) { setStatus("文本不能为空"); return; }
         if (!clip.role) { setStatus("未选择角色"); return; }
-        if (!clip.emotion) { setStatus("未选择情感"); return; }
+        clip.emotion = clip.emotion || "平静";
         clip.queued = true;
         renderList();
         enqueueJob({
@@ -1907,7 +1934,7 @@
     function rebuildEmotionSelect(selectEl, role, selected) {
       const emos = (rolesData[role] || []).slice();
       if (selected && !emos.includes(selected)) emos.push(selected);
-      if (emos.length === 0) emos.push(selected || "(无)");
+      if (emos.length === 0) emos.push("平静");
 
       selectEl.innerHTML = "";
       emos.forEach(e => {
@@ -2044,17 +2071,15 @@
       const role = genRole.value;
       const emos = rolesData[role] || [];
       genEmotion.innerHTML = "";
-      if (emos.length === 0) {
-        const o = document.createElement("option");
-        o.value = ""; o.textContent = "(无情感)";
-        genEmotion.appendChild(o);
-      } else {
-        emos.forEach(e => {
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "";
+      defaultOption.textContent = "默认 · 平静";
+      genEmotion.appendChild(defaultOption);
+      emos.filter(e => e !== "平静").forEach(e => {
           const o = document.createElement("option");
           o.value = e; o.textContent = e;
           genEmotion.appendChild(o);
-        });
-      }
+      });
       // 给生成器的角色下拉也着色
       applyRoleColorVars(genRole, role);
       applyRoleColorVars(genEmotion, role);
@@ -2087,12 +2112,11 @@
     // ============================================================
     function generateClip() {
       const role = genRole.value;
-      const emotion = genEmotion.value;
+      const emotion = genEmotion.value || "平静";
       const text = genText.value.trim();
       const language = genLanguage.value;
 
       if (!role) { setGenStatus("请先选择角色", "err"); return; }
-      if (!emotion) { setGenStatus("请先选择情感", "err"); return; }
       if (!text) { setGenStatus("请输入文本", "err"); return; }
 
       const clipId = ++clipIdCounter;
@@ -2114,7 +2138,7 @@
       renderList();
 
       enqueueJob({ clipId, role, emotion, text, language });
-      setGenStatus("✓ 已加入队列", "ok");
+      setGenStatus("已加入队列", "ok");
     }
 
     // ============================================================
@@ -2145,26 +2169,6 @@
     setStatus("就绪");
   </script>
 
-  <a href="/maker" target="_blank" rel="noopener" style="
-     position: fixed;
-     top: 7px; left: 50%;
-     transform: translateX(-50%);
-     z-index: 9999;
-     padding: 9px 18px;
-     font: 12px/1 -apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
-     color: #72e68a;
-     background: #111316;
-     border: 1px solid #3a6b45;
-     border-radius: 8px;
-     text-decoration: none;
-     box-shadow: 0 4px 16px #0008;
-     transition: background .15s,color .15s,box-shadow .15s;
-     white-space: nowrap;
-   "
-    onmouseover="this.style.background='#16201a';this.style.color='#8aeea0';this.style.boxShadow='0 4px 20px #72e68a33';"
-    onmouseout="this.style.background='#111316';this.style.color='#72e68a';this.style.boxShadow='0 4px 16px #0008';">
-    🎙️ 音色打包器 ↗
-  </a>
 </body>
 
 </html>

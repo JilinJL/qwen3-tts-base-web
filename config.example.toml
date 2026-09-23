@@ -1,0 +1,11 @@
+[qwen3_tts]
+device = "auto"
+model = "1.7B"
+source = "domestic"
+host = "0.0.0.0"
+port = 8001
+offline = false
+# Optional HTTPS endpoints; empty strings use the source profile defaults.
+pip_index = ""
+torch_index = ""
+hf_endpoint = ""

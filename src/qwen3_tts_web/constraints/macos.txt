@@ -1,0 +1,6 @@
+torch==2.7.1
+torchaudio==2.7.1
+torchvision==0.22.1
+transformers==4.57.3
+accelerate==1.12.0
+qwen-tts==0.1.1
