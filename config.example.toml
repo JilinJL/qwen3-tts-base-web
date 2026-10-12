@@ -9,3 +9,14 @@ offline = false
 pip_index = ""
 torch_index = ""
 hf_endpoint = ""
+
+[tts_agent]
+# Required for the Windows worker. Use wss:// in production.
+gateway_url = "wss://example.invalid/v1/worker/ws"
+token = ""
+worker_id = ""
+qwen_url = "http://127.0.0.1:8001"
+reconnect_min = 1.0
+reconnect_max = 30.0
+request_timeout = 3600.0
+max_queue = 32

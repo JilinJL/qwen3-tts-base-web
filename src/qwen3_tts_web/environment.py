@@ -8,6 +8,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import sysconfig
 from dataclasses import dataclass
 
 import psutil
@@ -22,7 +23,15 @@ class Check:
 
 def platform_profile(settings, system=None, machine=None, gpu_rows=None):
     system = system or platform.system()
+    # Some Windows Python builds report an empty platform.machine(); use the
+    # interpreter target platform before rejecting a supported GPU.
     machine = machine or platform.machine()
+    if (
+        not machine
+        and system == "Windows"
+        and sysconfig.get_platform().lower() == "win-amd64"
+    ):
+        machine = "amd64"
     if system == "Darwin":
         if machine != "arm64":
             raise RuntimeError(

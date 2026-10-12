@@ -23,10 +23,12 @@ server = [
   "fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1",
   "pydantic>=2.10,<3", "python-multipart>=0.0.20,<1",
   "soundfile>=0.13,<1", "numpy>=1.26,<3",
+  "httpx>=0.28,<1", "websockets>=13,<18",
 ]
 
 [project.scripts]
 qwen3-tts-web = "qwen3_tts_web.cli:main"
+tts-agent = "qwen3_tts_web.agent:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

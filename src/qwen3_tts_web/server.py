@@ -12,6 +12,7 @@ pt 目录结构：
 """
 
 import dataclasses
+import io
 import inspect
 import json
 import os
@@ -26,7 +27,7 @@ from types import SimpleNamespace
 from typing import Annotated, Any, Dict, List, Literal
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 from starlette.background import BackgroundTask
@@ -175,6 +176,7 @@ class TTSRequest(BaseModel):
     mode: str = "url"  # "url" | "file"
     pt_file: str = ""  # 兼容旧接口
     clip_id: str | None = None
+    persist: bool = True
 
 
 class VoiceDesignRequest(BaseModel):
@@ -348,9 +350,33 @@ def list_pt_roles() -> Dict[str, List[str]]:
     return result
 
 
+def safe_pt_component(value: str) -> bool:
+    return bool(
+        isinstance(value, str)
+        and value
+        and value not in (".", "..")
+        and "/" not in value
+        and "\\" not in value
+        and ":" not in value
+    )
+
+
+def safe_pt_path(relative: str) -> Path:
+    if not isinstance(relative, str) or not relative.lower().endswith(".pt"):
+        raise ValueError("pt_file must be a relative .pt path")
+    parts = relative.replace("\\", "/").split("/")
+    if not parts or any(not safe_pt_component(part) for part in parts):
+        raise ValueError("pt_file contains an invalid path")
+    candidate = (PT_DIR / Path(*parts)).resolve()
+    root = PT_DIR.resolve()
+    if root not in candidate.parents:
+        raise ValueError("pt_file must stay inside the pt directory")
+    return candidate
+
+
 def resolve_pt_path(role: str, emotion: str):
     """根据 角色+情感 定位 .pt 文件；找不到返回 None。"""
-    if not role or not emotion:
+    if not safe_pt_component(role) or not safe_pt_component(emotion):
         return None
     role_dir = PT_DIR / role
     if not role_dir.is_dir():
@@ -618,7 +644,10 @@ def api_tts(req: TTSRequest):
         raise HTTPException(400, detail="mode 必须是 'file' 或 'url'")
     # 定位 .pt
     if req.pt_file:
-        p = PT_DIR / req.pt_file
+        try:
+            p = safe_pt_path(req.pt_file)
+        except ValueError as exc:
+            raise HTTPException(400, detail=str(exc))
     else:
         if not req.role:
             raise HTTPException(400, detail="必须提供 role")
@@ -645,6 +674,18 @@ def api_tts(req: TTSRequest):
 
         traceback.print_exc()
         raise HTTPException(500, detail=f"生成失败: {e}")
+
+    if not req.persist:
+        import numpy as np
+        import soundfile as sf
+
+        buffer = io.BytesIO()
+        sf.write(buffer, np.asarray(wavs[0]), sr, format="WAV")
+        return Response(
+            content=buffer.getvalue(),
+            media_type="audio/wav",
+            headers={"X-Audio-Sample-Rate": str(sr)},
+        )
 
     generated = {
         "role": req.role,
