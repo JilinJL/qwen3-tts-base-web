@@ -14,6 +14,7 @@ import websockets
 
 from scripts.speakvideo.base_agent import AgentSettings
 from scripts.speakvideo.metrics import collect_metrics
+from scripts.speakvideo.interface_docs import SCHEMA, build_interface_document
 from scripts.speakvideo.speakvideo_agent import SpeakVideoAgent
 from scripts.speakvideo.voice_library import VoiceLibrary
 
@@ -123,6 +124,32 @@ class NoopQwen:
 
 
 class ProtocolExtensionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_capabilities_rpc_returns_machine_readable_interface_docs(self):
+        settings = AgentSettings(
+            root=Path(tempfile.mkdtemp()),
+            gateway_url="wss://example.invalid/v1/worker/ws",
+            token="t" * 32,
+            worker_id="LINHP",
+        )
+        agent = SpeakVideoAgent(settings, NoopQwen())
+        try:
+            await agent.rpc({"type": "worker.capabilities", "request_id": "cap-1"})
+            result = await agent.next_event()
+        finally:
+            agent.journal.close()
+        self.assertEqual(result["type"], "rpc.result")
+        self.assertEqual(result["request_id"], "cap-1")
+        self.assertEqual(result["result"]["schema"], SCHEMA)
+        self.assertTrue(result["result"]["worker_id"], "worker id is required")
+        self.assertNotIn("token", json.dumps(result["result"]).lower())
+        rpc_types = {item["type"] for item in result["result"]["rpc"]}
+        self.assertIn("voice.manage", rpc_types)
+        self.assertIn("worker.capabilities", rpc_types)
+        self.assertEqual(
+            set(result["result"]["voice_manage_actions"]),
+            {"list", "import", "edit", "delete", "reference", "trash", "restore"},
+        )
+
     async def test_hello_advertises_durable_rpc_capabilities(self):
         received = {}
 
@@ -151,6 +178,7 @@ class ProtocolExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(received["hello"]["capabilities"]["durable_jobs"])
         self.assertTrue(received["hello"]["capabilities"]["rpc"])
         self.assertTrue(received["hello"]["capabilities"]["correlated_acks"])
+        self.assertTrue(received["hello"]["capabilities"]["interface_docs"])
         self.assertEqual(received["pong"]["type"], "worker.pong")
 
     async def test_metrics_rpc_preserves_request_id(self):

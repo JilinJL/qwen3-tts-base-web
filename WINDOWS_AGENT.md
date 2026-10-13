@@ -88,5 +88,23 @@ single-device.
 
 The worker also implements `worker.health`, `worker.metrics`, `job.query`,
 `voice.list`, `voice.download`, `voice.create`, `voice.design`,
-`voice.delete`, and `voice.manage` RPCs. See the Mac integration contract for
-the full request and response schema.
+`voice.delete`, `voice.manage`, and `worker.capabilities` RPCs. Mac should query
+`worker.capabilities` after every Worker connection instead of hard-coding an
+older feature list. The same machine-readable document is included by
+`worker.health` unless the request contains `include_docs: false`.
+
+The capabilities document is token-free and contains the transport handshake,
+all worker RPCs and events, voice-management actions, payload limits, and the
+internal Qwen routes used by the worker. The Gateway must forward the generic
+RPC request and response with the original `request_id`; no Windows HTTP port
+needs to be exposed.
+
+Example query over the existing Worker WebSocket:
+
+```json
+{"type":"worker.capabilities","request_id":"cap-<unique-id>"}
+```
+
+The response is a `rpc.result` with the same `request_id` and the document in
+`result`. A lightweight health query can use
+`{"type":"worker.health","request_id":"health-1","include_docs":false}`.

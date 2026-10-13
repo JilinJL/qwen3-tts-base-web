@@ -22,11 +22,13 @@ if __package__:
     from .base_agent import Agent, QwenClient, load_agent_settings
     from .journal import Journal
     from .metrics import collect_metrics
+    from .interface_docs import build_interface_document
     from .voice_library import VoiceLibrary
 else:
     from base_agent import Agent, QwenClient, load_agent_settings
     from journal import Journal
     from metrics import collect_metrics
+    from interface_docs import build_interface_document
     from voice_library import VoiceLibrary
 
 NAME = re.compile(r"^[\w-]{1,64}$")
@@ -173,7 +175,9 @@ class SpeakVideoAgent(Agent):
         kind = message["type"]
         response = {"type": "rpc.result", "request_id": message.get("request_id", "")}
         try:
-            if kind == "job.query":
+            if kind == "worker.capabilities":
+                response["result"] = build_interface_document(self.settings.worker_id)
+            elif kind == "job.query":
                 job_id = message.get("job_id", "")
                 row = self.journal.get(job_id)
                 response.update(job_id=job_id, status="missing" if row is None else row["status"])
@@ -208,8 +212,13 @@ class SpeakVideoAgent(Agent):
                                 "voice_manage": True,
                                 "voice_reference": True,
                                 "metrics": True,
+                                "interface_docs": True,
                             },
                         )
+                        if message.get("include_docs", True):
+                            response["interface_docs"] = build_interface_document(
+                                self.settings.worker_id
+                            )
                     elif kind == "worker.metrics":
                         response["result"] = await asyncio.to_thread(
                             collect_metrics,
@@ -273,6 +282,7 @@ class SpeakVideoAgent(Agent):
     async def handle_message(self, message):
         if message.get("type") in {
             "worker.health",
+            "worker.capabilities",
             "worker.metrics",
             "job.query",
             "voice.list",
@@ -324,6 +334,7 @@ class SpeakVideoAgent(Agent):
                             "durable_jobs": True,
                             "rpc": True,
                             "correlated_acks": True,
+                            "interface_docs": True,
                         },
                     }
                 )
