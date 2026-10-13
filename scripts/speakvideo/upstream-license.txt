@@ -1,0 +1,5 @@
+SpeakVideo Windows worker license notice
+
+The worker files in this directory are part of qwen3-tts-web and are
+distributed under the MIT license in the repository root LICENSE file. The
+worker does not bundle a third-party model or binary.

@@ -12,9 +12,9 @@ hf_endpoint = ""
 
 [tts_agent]
 # Required for the Windows worker. Use wss:// in production.
-gateway_url = "wss://example.invalid/v1/worker/ws"
+gateway_url = "wss://linhanping.com/v1/worker/ws"
 token = ""
-worker_id = ""
+worker_id = "LINHP"
 qwen_url = "http://127.0.0.1:8001"
 reconnect_min = 1.0
 reconnect_max = 30.0

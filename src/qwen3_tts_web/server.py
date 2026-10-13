@@ -186,6 +186,7 @@ class VoiceDesignRequest(BaseModel):
     mode: Literal["url", "file"] = "url"
     clip_id: str | None = None
     allow_download: bool = False
+    persist: bool = True
 
     @field_validator("text", "instruct")
     @classmethod
@@ -320,7 +321,8 @@ def capabilities():
 
 
 class PromptCreateRequest(BaseModel):
-    ref_audio: str
+    ref_audio: str = ""
+    ref_audio_base64: str = ""
     ref_text: str = ""
     role: str
     emotion: Emotion = "平静"
@@ -530,7 +532,7 @@ _SAFE = re.compile(r"^[\w\u4e00-\u9fa5\-]{1,30}$")
 def api_pt_create(req: PromptCreateRequest):
     import torch
 
-    if not os.path.exists(req.ref_audio):
+    if not req.ref_audio_base64 and not os.path.exists(req.ref_audio):
         raise HTTPException(404, detail=f"参考音频不存在: {req.ref_audio}")
     if not req.role:
         raise HTTPException(400, detail="必须提供 role")
@@ -548,7 +550,26 @@ def api_pt_create(req: PromptCreateRequest):
             400, detail=f"文件已存在: {req.role}/{fname}（可传 overwrite=true 覆盖）"
         )
 
-    kwargs = {"ref_audio": req.ref_audio}
+    # SpeakVideo memory reference v1
+    if req.ref_audio_base64:
+        import base64
+        import soundfile as sf
+
+        try:
+            raw = base64.b64decode(req.ref_audio_base64, validate=True)
+            if not raw or len(raw) > 32 * 1024 * 1024:
+                raise ValueError("reference exceeds 32 MiB")
+            audio, sample_rate = sf.read(io.BytesIO(raw), dtype="float32")
+            if audio.ndim == 2:
+                audio = audio.mean(axis=1)
+            if not len(audio) or len(audio) / sample_rate > 120:
+                raise ValueError("reference must contain 0..120 seconds of audio")
+            reference = (audio, sample_rate)
+        except Exception as exc:
+            raise HTTPException(400, detail=f"invalid memory reference: {exc}")
+    else:
+        reference = req.ref_audio
+    kwargs = {"ref_audio": reference}
     if req.ref_text:
         kwargs["ref_text"] = req.ref_text
     else:
@@ -570,9 +591,12 @@ def api_pt_create(req: PromptCreateRequest):
     print(f"[create] {len(prompt_list)} item(s), type={type(prompt_list[0]).__name__}")
     print(f"[create] 字段: {_state_for_debug(prompt_list)}")
 
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
-        torch.save(prompt_list, str(path))
+        torch.save(prompt_list, str(temporary))
+        os.replace(temporary, path)
     except Exception as e:
+        temporary.unlink(missing_ok=True)
         raise HTTPException(500, detail=f"保存 pt 失败: {e}")
 
     return {
@@ -699,6 +723,14 @@ def api_tts(req: TTSRequest):
 
 
 def save_generation(req, wavs, sr, generated):
+    if not getattr(req, "persist", True):
+        import numpy as np
+        import soundfile as sf
+
+        buffer = io.BytesIO()
+        sf.write(buffer, np.asarray(wavs[0]), sr, format="WAV")
+        return Response(content=buffer.getvalue(), media_type="audio/wav",
+                        headers={"X-Audio-Sample-Rate": str(sr)})
     metadata = {"generated": generated}
     if not req.clip_id:
         metadata.update(generated, title=req.text[:60])

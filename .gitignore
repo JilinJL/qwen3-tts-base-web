@@ -4,6 +4,7 @@
 .venv-test/
 .pytest_cache/
 .logs/
+.speakvideo/
 .setup.lock
 .runtime.lock
 config.toml
@@ -11,6 +12,7 @@ config.toml.tmp
 build/
 dist/
 *.egg-info/
+*.speakvideo-*.bak
 .coverage
 htmlcov/
 __pycache__/

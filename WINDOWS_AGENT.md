@@ -1,8 +1,9 @@
-# Windows TTS Agent
+# Windows SpeakVideo Agent
 
-The Windows machine keeps the Qwen3-TTS model and GPU. `tts-agent` is a
-separate process from the local FastAPI service and only makes outbound WSS
-connections to the gateway.
+The Windows machine keeps the Qwen3-TTS model and GPU. The production worker
+is `scripts/speakvideo/speakvideo_agent.py`; it is separate from the local
+FastAPI service and only makes outbound WSS connections to the gateway. The
+legacy `tts-agent` entry point remains available for protocol-v1 compatibility.
 
 ## Configuration
 
@@ -21,11 +22,23 @@ request_timeout = 3600.0
 max_queue = 32
 ```
 
-Start it after `qwen3-tts-web` is running:
+For the upgraded SpeakVideo contract, start Qwen and the worker with the
+scheduled-task installer (run PowerShell as Administrator):
 
 ```powershell
-./scripts/agent.ps1
+./scripts/speakvideo/install.ps1 -Start
 ```
+
+For a foreground worker run, after `qwen3-tts-web` is running:
+
+```powershell
+./scripts/speakvideo/run.ps1 -Mode agent
+```
+
+The worker writes only job metadata to `.speakvideo/jobs.sqlite3`. Generated
+WAV data stays in memory; PT metadata, reference WAV files, and soft-delete
+archives are stored under `.speakvideo/voice-trash/` as required by the
+Windows integration contract.
 
 For local protocol testing without a token only:
 
@@ -51,7 +64,14 @@ gateway -> agent: voice.sync { sync_id, files: [{ path, sha256, content_base64 }
 agent -> gateway: voice.sync.result
 ```
 
-`job_id` is idempotent for the lifetime of the agent process. PT paths are
-restricted to `pt/<role>/<file>.pt`, SHA-256 is checked before install, and
-files are validated before an atomic replace. The queue is deliberately
-serial because the underlying model and `inference_lock` are single-device.
+The upgraded contract uses durable IDs matching `j_<64 lowercase hex>` and
+persists job metadata in SQLite before acknowledging acceptance. PT paths are
+restricted to `pt/<role>/<role>_<emotion>.pt`, SHA-256 is checked again before
+inference, and files are validated before an atomic replace. The queue is
+deliberately serial because the underlying model and `inference_lock` are
+single-device.
+
+The worker also implements `worker.health`, `worker.metrics`, `job.query`,
+`voice.list`, `voice.download`, `voice.create`, `voice.design`,
+`voice.delete`, and `voice.manage` RPCs. See the Mac integration contract for
+the full request and response schema.
