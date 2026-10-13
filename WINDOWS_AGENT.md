@@ -35,6 +35,21 @@ For a foreground worker run, after `qwen3-tts-web` is running:
 ./scripts/speakvideo/run.ps1 -Mode agent
 ```
 
+For normal operation, use the elevated convenience scripts. They register the
+startup tasks when needed, avoid starting a second healthy Qwen process, and
+wait for child processes to release their locks during shutdown:
+
+```powershell
+./scripts/speakvideo/start.ps1              # start Qwen and the Agent
+./scripts/speakvideo/start.ps1 -Mode agent  # start only the Agent
+./scripts/speakvideo/stop.ps1               # stop both services
+./scripts/speakvideo/stop.ps1 -Mode agent   # stop only the Agent
+```
+
+Both scripts request administrator permission through UAC when necessary.
+The Agent launcher derives the gateway host from `config.toml` and adds it to
+`NO_PROXY`, so the Windows system proxy cannot stall the outbound WSS session.
+
 The worker writes only job metadata to `.speakvideo/jobs.sqlite3`. Generated
 WAV data stays in memory; PT metadata, reference WAV files, and soft-delete
 archives are stored under `.speakvideo/voice-trash/` as required by the
