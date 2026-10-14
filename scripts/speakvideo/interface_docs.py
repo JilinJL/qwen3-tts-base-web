@@ -31,7 +31,7 @@ def build_interface_document(worker_id: str) -> dict:
         "worker_id": worker_id,
         "transport": {
             "kind": "websocket",
-            "direction": "gateway_to_worker over outbound WSS",
+                "direction": "server_to_worker over outbound WSS",
             "hello": {
                 "type": "worker.hello",
                 "protocol": PROTOCOL_VERSION,

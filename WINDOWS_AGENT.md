@@ -2,7 +2,7 @@
 
 The Windows machine keeps the Qwen3-TTS model and GPU. The production worker
 is `scripts/speakvideo/speakvideo_agent.py`; it is separate from the local
-FastAPI service and only makes outbound WSS connections to the gateway. The
+FastAPI service and only makes outbound WSS connections to the remote service. The
 legacy `tts-agent` entry point remains available for protocol-v1 compatibility.
 
 ## Configuration
@@ -47,7 +47,7 @@ wait for child processes to release their locks during shutdown:
 ```
 
 Both scripts request administrator permission through UAC when necessary.
-The Agent launcher derives the gateway host from `config.toml` and adds it to
+The Agent launcher derives the remote WSS host from `config.toml` and adds it to
 `NO_PROXY`, so the Windows system proxy cannot stall the outbound WSS session.
 
 The worker writes only job metadata to `.speakvideo/jobs.sqlite3`. Generated
@@ -64,19 +64,19 @@ For local protocol testing without a token only:
 NSSM service registration is provided by `scripts/install-agent.ps1`. The
 script expects `nssm.exe` on `PATH` and requires an elevated PowerShell.
 
-## Gateway protocol v1
+## Worker protocol v1
 
 The agent sends JSON text frames and never writes synthesized audio to disk.
 Audio is returned as base64-encoded WAV in the result event.
 
 ```text
-agent -> gateway: worker.hello
-gateway -> agent: job.submit { job: { job_id, text, language, role, emotion } }
-agent -> gateway: job.accepted
-agent -> gateway: job.running
-agent -> gateway: job.result { status, sample_rate, audio_base64 }
-gateway -> agent: voice.sync { sync_id, files: [{ path, sha256, content_base64 }] }
-agent -> gateway: voice.sync.result
+agent -> server: worker.hello
+server -> agent: job.submit { job: { job_id, text, language, role, emotion } }
+agent -> server: job.accepted
+agent -> server: job.running
+agent -> server: job.result { status, sample_rate, audio_base64 }
+server -> agent: voice.sync { sync_id, files: [{ path, sha256, content_base64 }] }
+agent -> server: voice.sync.result
 ```
 
 The upgraded contract uses durable IDs matching `j_<64 lowercase hex>` and
@@ -88,7 +88,7 @@ single-device.
 
 The worker also implements `worker.health`, `worker.metrics`, `job.query`,
 `voice.list`, `voice.download`, `voice.create`, `voice.design`,
-`voice.delete`, `voice.manage`, and `worker.capabilities` RPCs. Mac should query
+`voice.delete`, `voice.manage`, and `worker.capabilities` RPCs. Clients should query
 `worker.capabilities` after every Worker connection instead of hard-coding an
 older feature list. The same machine-readable document is included by
 `worker.health` unless the request contains `include_docs: false`.
@@ -104,12 +104,12 @@ Voice deletion has two explicit modes:
   accepts `permanent: true` when an older client needs the permanent behavior.
 
 Both permanent forms require `role`, `emotion`, and the current `sha256` when
-the PT exists. A stale SHA is rejected so a delayed Mac request cannot delete a
-new asset that reused the same role and emotion.
+the PT exists. A stale SHA is rejected so a delayed client request cannot delete
+a new asset that reused the same role and emotion.
 
 The capabilities document is token-free and contains the transport handshake,
 all worker RPCs and events, voice-management actions, payload limits, and the
-internal Qwen routes used by the worker. The Gateway must forward the generic
+internal Qwen routes used by the worker. The remote service must forward the generic
 RPC request and response with the original `request_id`; no Windows HTTP port
 needs to be exposed.
 

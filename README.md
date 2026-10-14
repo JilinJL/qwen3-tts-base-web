@@ -3,31 +3,15 @@
 这个仓库提供两部分能力：
 
 1. 跨平台的 Qwen3-TTS 本地 Web 服务和音色工作台。
-2. 面向 SpeakVideo 的 Windows GPU Worker。Mac 端可以通过阿里云 Gateway 将任务转发到 Windows 算力机，Windows 只通过出站 WSS 连接 Gateway，不需要把本机 HTTP 端口暴露到公网。
+2. 面向 SpeakVideo 的 Windows GPU Worker。Worker 通过出站 WSS 接收远程任务，并使用本机 NVIDIA GPU 完成推理。
 
-仓库不包含阿里云 Gateway 服务端代码。Gateway 负责鉴权、转发 WebSocket 消息和保留 `request_id`；本仓库负责 Qwen 推理、Windows 音色库、任务队列和 Worker 协议。
+本仓库负责 Qwen 推理、Windows 音色库、任务队列和 Worker 协议。
 
 ## 工作模式
 
 ### Mac 本机运行
 
 Mac 上直接启动 Qwen3-TTS Web 服务，浏览器访问本机 Web 工作台。Apple Silicon 使用 MPS；模型和音色都保存在 Mac 本机。
-
-### Mac 编排 Windows GPU
-
-```text
-Mac UI / Mac 编排服务
-          |
-          | WSS + request_id
-          v
-阿里云 Gateway
-          |
-          | outbound WSS
-          v
-Windows SpeakVideo Agent -> http://127.0.0.1:8001 -> Qwen3-TTS + NVIDIA GPU
-```
-
-Windows Agent 不承担公网 HTTP 接入。Mac 需要先通过 Gateway 查询 `worker.capabilities`，再根据返回的动态接口文档调用能力，避免把旧的接口列表写死在 Mac 客户端中。
 
 ## 快速开始
 
@@ -79,7 +63,7 @@ notepad .\config.toml
 
 ```toml
 [tts_agent]
-gateway_url = "wss://your-gateway.example/v1/worker/ws"
+gateway_url = "wss://your-worker-endpoint.example/v1/worker/ws"
 token = "仅填入本机，不要提交到 Git"
 worker_id = "WIN-GPU-01"
 qwen_url = "http://127.0.0.1:8001"
@@ -113,11 +97,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\speakvideo\install
 .\scripts\speakvideo\run.ps1 -Mode agent
 ```
 
-脚本会避免重复启动健康的 Qwen 进程，Agent 会将 Gateway 主机加入 `NO_PROXY`，并把日志写入 `.speakvideo/logs/`。Windows Agent 更新代码后需要重启 Agent 才会加载新接口。
+脚本会避免重复启动健康的 Qwen 进程，Agent 会将远程 WSS 服务主机加入 `NO_PROXY`，并把日志写入 `.speakvideo/logs/`。Windows Agent 更新代码后需要重启 Agent 才会加载新接口。
 
 ## Worker 接口发现与调用
 
-所有 Worker RPC 都通过现有 Worker WebSocket 连接传输，Gateway 应原样转发请求和响应，并保留同一个 `request_id`。不需要开放 Windows 的 8001 端口。
+所有 Worker RPC 都通过现有 Worker WebSocket 连接传输，并保留同一个 `request_id`。不需要开放 Windows 的 8001 端口。
 
 查询动态接口文档：
 
@@ -218,7 +202,7 @@ Worker 只通过 `qwen_url` 访问这些内部接口。默认 `qwen_url` 是 `ht
 ## 安全边界
 
 - 不要提交 `config.toml`、Worker Token、模型、PT、WAV 或日志。
-- Gateway 必须使用 WSS 和 Worker 鉴权；生产环境不要使用匿名 Agent。
+- 远程服务必须使用 WSS 和 Worker 鉴权；生产环境不要使用匿名 Agent。
 - 本地服务默认可以配置为 `127.0.0.1`。只有在明确需要局域网访问且有额外鉴权时才监听 `0.0.0.0`。
 - PT 文件可能包含可执行的 PyTorch 序列化内容，只加载可信来源的 PT 文件。
 
