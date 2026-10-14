@@ -1,189 +1,245 @@
-<div align="center">
+# Qwen3-TTS Web 与 SpeakVideo Windows Agent
 
-# Qwen3-TTS Web
+这个仓库提供两部分能力：
 
-**在电脑上运行的本地语音工作台**
+1. 跨平台的 Qwen3-TTS 本地 Web 服务和音色工作台。
+2. 面向 SpeakVideo 的 Windows GPU Worker。Mac 端可以通过阿里云 Gateway 将任务转发到 Windows 算力机，Windows 只通过出站 WSS 连接 Gateway，不需要把本机 HTTP 端口暴露到公网。
 
-角色克隆 · Prompt 音色设计 · 本地语音库 · 批量导出 · 中文 TUI
+仓库不包含阿里云 Gateway 服务端代码。Gateway 负责鉴权、转发 WebSocket 消息和保留 `request_id`；本仓库负责 Qwen 推理、Windows 音色库、任务队列和 Worker 协议。
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](pyproject.toml)
-[![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
-![macOS](https://img.shields.io/badge/macOS-Apple_Silicon-000000?logo=apple&logoColor=white)
-![Windows](https://img.shields.io/badge/Windows-NVIDIA_CUDA-76B900?logo=nvidia&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-NVIDIA_CUDA-76B900?logo=linux&logoColor=white)
-![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
+## 工作模式
 
-[快速开始](#快速开始) · [常用命令](#常用命令) · [功能与使用](#功能与使用) · [运行要求](#运行要求)
+### Mac 本机运行
 
-</div>
+Mac 上直接启动 Qwen3-TTS Web 服务，浏览器访问本机 Web 工作台。Apple Silicon 使用 MPS；模型和音色都保存在 Mac 本机。
+
+### Mac 编排 Windows GPU
+
+```text
+Mac UI / Mac 编排服务
+          |
+          | WSS + request_id
+          v
+阿里云 Gateway
+          |
+          | outbound WSS
+          v
+Windows SpeakVideo Agent -> http://127.0.0.1:8001 -> Qwen3-TTS + NVIDIA GPU
+```
+
+Windows Agent 不承担公网 HTTP 接入。Mac 需要先通过 Gateway 查询 `worker.capabilities`，再根据返回的动态接口文档调用能力，避免把旧的接口列表写死在 Mac 客户端中。
 
 ## 快速开始
 
-**支持 macOS Apple Silicon，以及 Windows / Linux 的 NVIDIA 显卡。** 不需要提前创建虚拟环境；引导脚本会检查 Python 3.11，并在确认后安装缺失工具。
+### 环境要求
 
-### 1. 获取项目
+- Python 3.11，且版本小于 3.12。
+- macOS Apple Silicon：使用 MPS，建议 24 GiB 或以上统一内存。
+- Windows / Linux NVIDIA：安装可用的 CUDA 驱动；`device = "auto"` 会自动选择设备，也可以设置为 `cuda:0`。
+- 模型不会提交到 Git。首次安装和下载需要网络以及足够的磁盘空间。
 
-```bash
-git clone https://github.com/NOTF-API/qwen3-tts-web.git
-cd qwen3-tts-web
-```
+### Mac、Linux 或 Windows 本地服务
 
-已有项目时，直接在项目目录执行下面的命令。
-
-### 2. 安装并启动
-
-**macOS / Linux**
+macOS / Linux：
 
 ```bash
-# 首次安装依赖并下载 Base 模型
 bash scripts/bootstrap.sh setup
-
-# 启动服务，仅允许本机访问
 bash scripts/bootstrap.sh serve --host 127.0.0.1
 ```
 
-**Windows PowerShell**
+Windows PowerShell：
 
 ```powershell
-# 首次安装依赖并下载 Base 模型
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 setup
-
-# 启动服务，仅允许本机访问
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 serve --host 127.0.0.1
 ```
 
-### 3. 打开工作台
-
-浏览器访问 **[http://localhost:8001](http://localhost:8001)**。服务不会自动打开浏览器。
-
-> **更喜欢菜单操作？** macOS / Linux 执行 `bash scripts/bootstrap.sh`；Windows 执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1`。进入中文 TUI 后选择「安装 / 修复」，完成后选择「启动服务」。
-
-## 常用命令
-
-`setup` 已包含默认模型下载，日常只需 `serve`。以下子命令可接在两个平台入口之后：
-
-| 操作 | 子命令 |
-| --- | --- |
-| 环境检查，不安装 | `doctor` |
-| 安装 / 修复依赖与默认模型 | `setup` |
-| 下载默认 Base 模型 | `download` |
-| 下载描述音色模型 | `download --model-key voicedesign` |
-| 启动本机服务 | `serve --host 127.0.0.1` |
-| 离线启动 | `serve --offline --host 127.0.0.1` |
-
-<details>
-<summary><strong>完整命令示例与可选参数</strong></summary>
+启动后打开 <http://127.0.0.1:8001>。首次使用可以执行 `doctor` 检查依赖，使用 `download` 下载默认模型：
 
 ```bash
-# macOS / Linux
 bash scripts/bootstrap.sh doctor
-bash scripts/bootstrap.sh download --model-key voicedesign
-bash scripts/bootstrap.sh serve --offline --host 127.0.0.1
+bash scripts/bootstrap.sh download
 ```
 
 ```powershell
-# Windows PowerShell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 doctor
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 download --model-key voicedesign
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 serve --offline --host 127.0.0.1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 download
 ```
 
-| 参数 | 用途 |
+### Windows GPU Worker
+
+先复制配置模板并填写 Worker 信息：
+
+```powershell
+Copy-Item .\config.example.toml .\config.toml
+notepad .\config.toml
+```
+
+至少需要配置 `[tts_agent]` 中的：
+
+```toml
+[tts_agent]
+gateway_url = "wss://your-gateway.example/v1/worker/ws"
+token = "仅填入本机，不要提交到 Git"
+worker_id = "WIN-GPU-01"
+qwen_url = "http://127.0.0.1:8001"
+```
+
+初始化依赖并注册 Windows 计划任务：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 setup
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\speakvideo\install.ps1 -Start
+```
+
+日常启停：
+
+```powershell
+.\scripts\speakvideo\start.ps1
+.\scripts\speakvideo\stop.ps1
+```
+
+只操作某一部分服务：
+
+```powershell
+.\scripts\speakvideo\start.ps1 -Mode qwen
+.\scripts\speakvideo\start.ps1 -Mode agent
+.\scripts\speakvideo\stop.ps1 -Mode agent
+```
+
+前台调试可以在 Qwen 服务已经运行后执行：
+
+```powershell
+.\scripts\speakvideo\run.ps1 -Mode agent
+```
+
+脚本会避免重复启动健康的 Qwen 进程，Agent 会将 Gateway 主机加入 `NO_PROXY`，并把日志写入 `.speakvideo/logs/`。Windows Agent 更新代码后需要重启 Agent 才会加载新接口。
+
+## Worker 接口发现与调用
+
+所有 Worker RPC 都通过现有 Worker WebSocket 连接传输，Gateway 应原样转发请求和响应，并保留同一个 `request_id`。不需要开放 Windows 的 8001 端口。
+
+查询动态接口文档：
+
+```json
+{
+  "type": "worker.capabilities",
+  "request_id": "cap-unique-id"
+}
+```
+
+轻量健康检查：
+
+```json
+{
+  "type": "worker.health",
+  "request_id": "health-unique-id",
+  "include_docs": false
+}
+```
+
+当前 Worker RPC 包括：
+
+| RPC | 用途 |
 | --- | --- |
-| `--model 0.6B` | 使用较小的 Base；VoiceDesign 仍为 1.7B |
-| `--device mps` / `--device cuda:0` | 指定推理设备 |
-| `--port 8002` | 更换端口 |
-| `--source official` | 使用官方源 |
-| `--yes` | 自动确认安装 / 下载，适用于无人值守 |
+| `worker.capabilities` | 返回版本化、无 Token 的机器可读接口文档 |
+| `worker.health` | 返回 Qwen 就绪状态、设备和能力 |
+| `worker.metrics` | 返回 GPU、内存、队列和近期事件指标 |
+| `job.query` | 查询持久化任务状态，可选返回缓存音频 |
+| `voice.list` / `voice.download` | 查询或下载 Windows PT 音色 |
+| `voice.create` / `voice.design` | 创建音色或生成设计音色 |
+| `voice.delete` | 默认软删除；`permanent: true` 才永久删除 |
+| `voice.manage` | 音色导入、编辑、删除、引用音频、回收站和恢复 |
 
-管理环境准备完成后，也可使用该环境中的 `qwen3-tts-web` 命令。`doctor` 只检查；首次执行引导脚本时，若管理环境缺失，仍需先确认安装管理工具。
+### 音色删除语义
 
-</details>
+Mac 当前的永久删除请求如下：
 
-## 功能与使用
+```json
+{
+  "type": "voice.manage",
+  "request_id": "voice-delete-unique-id",
+  "payload": {
+    "action": "delete_permanent",
+    "role": "narrator",
+    "emotion": "calm",
+    "sha256": "当前 PT 文件的 64 位 SHA-256"
+  }
+}
+```
 
-| 功能 | 操作入口 | 结果 |
+成功响应包含：
+
+```json
+{
+  "type": "rpc.result",
+  "request_id": "voice-delete-unique-id",
+  "result": {
+    "deleted": true,
+    "permanent": true,
+    "remote_status": "deleted"
+  }
+}
+```
+
+`voice.manage` 的 `delete` 和不带 `permanent` 的 `voice.delete` 都是软删除，会移动到 `.speakvideo/voice-trash/`；`delete_permanent` 会校验 SHA-256 后删除 PT、同名 JSON 元数据和 WAV 参考音频，不创建回收站记录。SHA 不匹配时请求会失败，以防止 Mac 的旧库存误删后来替换的音色。
+
+## 本地 HTTP API
+
+本地 Qwen 服务启动后提供：
+
+- `/`：语音工作台。
+- `/maker`：参考音频和克隆音色管理。
+- `/docs`：FastAPI 交互式 API 文档。
+- `/api/health`：模型、设备和就绪状态。
+
+Worker 只通过 `qwen_url` 访问这些内部接口。默认 `qwen_url` 是 `http://127.0.0.1:8001`，建议保持回环地址，不要为了让 Mac 直连而暴露 Windows HTTP 服务。
+
+## 数据与目录
+
+| 路径 | 内容 | 是否提交 |
 | --- | --- | --- |
-| 角色克隆 | 「克隆音色」上传音频或直接录音，裁切后创建 `.pt`；回到「角色音色」输入台词 | 使用保存的角色音色合成，情绪默认「平静」 |
-| Prompt 音色设计 | 「描述音色」填写提示词与台词 | 独立 VoiceDesign 模型生成，无需参考音频 |
-| 本地语音库 | 工作台列表 | 刷新 / 重启后恢复，支持搜索、改名、编辑、重新生成与删除 |
-| 导出音频 | 单条下载，或勾选后批量导出 | 原始 WAV；批量 ZIP 包含音频与参数清单 |
-| 部署管理 | 中文 TUI | 环境检查、依赖修复、模型下载、服务启停与日志 |
+| `models/` | Qwen 模型文件 | 否 |
+| `pt/<role>/<role>_<emotion>.pt` | Windows 或本地的 PT 音色 | 否 |
+| `output/` | WAV 和本地音色数据库 | 否 |
+| `.speakvideo/jobs.sqlite3` | Worker 任务状态 | 否 |
+| `.speakvideo/voice-trash/` | 软删除音色回收站 | 否 |
+| `.speakvideo/logs/` | Windows 服务日志 | 否 |
+| `config.toml` | 本机配置和 Worker Token | 否 |
 
-**音色描述示例：**「年轻女性，温暖清晰的中音，语速舒缓，带自然的微笑感。」
+## GPU 和模型说明
 
-首次使用「描述音色」时，确认后下载 VoiceDesign 1.7B。Base 与 VoiceDesign 按需切换，设备上只保留一个推理模型，切换需要时间；离线模式不下载缺失模型。`.pt` 角色属于 Base 克隆提示文件，不是上游 CustomVoice 的内置说话人。CustomVoice 目前仅支持下载，尚未接入推理接口。
+- Windows NVIDIA 使用 PyTorch CUDA；默认模型是 Qwen3-TTS Base 1.7B，较小的 Base 0.6B 可降低显存压力。
+- Windows 建议 1.7B 至少准备约 6 GiB 显存，0.6B 至少准备约 4 GiB；实际占用取决于 PyTorch、音频长度和并发设置。
+- Mac Apple Silicon 使用 MPS。项目不承诺 Intel Mac、AMD GPU 或 MLX 推理路径。
+- Worker 队列默认串行，因为单个模型实例和单块 GPU 共享推理锁。
+- 生成 WAV 通过 WebSocket 内存中的 base64 返回，Worker 不把生成中间音频写入磁盘。
 
-### 浏览器录音
+## 安全边界
 
-在「克隆音色」页面选择麦克风，点击「开始录音」并允许权限，录制时显示实时输入波形。结束时点击「停止录音」，可拖动选区或填写起止时间，试听后「确认裁切」，再生成角色 `.pt`。录制最长 2 分钟；无声时会提示检查设备，不保存全静音录音；取消录音保留原参考音频。
+- 不要提交 `config.toml`、Worker Token、模型、PT、WAV 或日志。
+- Gateway 必须使用 WSS 和 Worker 鉴权；生产环境不要使用匿名 Agent。
+- 本地服务默认可以配置为 `127.0.0.1`。只有在明确需要局域网访问且有额外鉴权时才监听 `0.0.0.0`。
+- PT 文件可能包含可执行的 PyTorch 序列化内容，只加载可信来源的 PT 文件。
 
-使用 `http://localhost:8001/maker` 或 HTTPS 地址录音；普通局域网 HTTP 地址不提供麦克风访问。权限被拒绝时，请在浏览器站点设置中允许麦克风后重试。录音和裁切先在浏览器内处理，只有点击「生成 .pt 文件」才上传裁切后的 WAV；关闭页面前未提交的录音不会保留。
+## 开发与测试
 
-### 本地数据
+安装服务依赖后，在仓库根目录运行：
 
-- WAV 和 `output/library.sqlite3` 共同组成语音库；备份时先停止服务，再备份整个 `output/`。
-- 旧 `output/*.wav` 自动纳入列表，不移动文件；旧版未保存的台词和角色信息无法恢复。
-- 编辑参数不会修改已有音频；重新生成成功后才替换旧 WAV，失败则保留旧音频。
-- 删除需确认，会同时删除记录和对应文件。
-- 设备 / 信号音效仅用于浏览器播放，不包含在导出的原始 WAV 中。
+```powershell
+python -m unittest discover -s tests -p "test_*.py"
+```
 
-## 运行要求
-
-| 平台 | 推理方式 | 建议与限制 |
-| --- | --- | --- |
-| macOS Apple Silicon | MPS，`float32 + sdpa` | 原生 arm64 Python；建议 24 GiB 统一内存 |
-| Windows / Linux NVIDIA | CUDA，按设备选择精度 | 默认 1.7B 至少 6 GiB 显存，Base 0.6B 至少 4 GiB；安装时检查兼容性 |
-| 通用 | Python 3.11 | 首次部署建议至少 10 GiB 空闲磁盘；VoiceDesign 需额外空间 |
-
-不承诺 Intel Mac、纯 CPU、AMD GPU 或 MLX 支持，不静默回退 CPU，不默认安装 FlashAttention。
-
-默认下载完整 Base 模型（含内嵌语音 tokenizer，1.7B 约 4.6 GB）。国内源优先、官方源回退，完整模型直接复用。系统音频工具需单独确认安装，不自动安装系统包管理器、不修改全局镜像配置。
-
-## 配置与安全
-
-配置示例见 [config.example.toml](config.example.toml)。项目根目录的 `config.toml` 支持设备、Base 规格、下载源、监听地址和端口。
-
-**优先级：命令行 > `QWEN3_TTS_*` 环境变量 > `config.toml` > 默认值。**
-
-| 地址 | 用途 |
-| --- | --- |
-| `/` | 语音工作台与本地语音库 |
-| `/maker` | 参考音频与克隆角色管理 |
-| `/docs` | 交互式 HTTP API 文档 |
-| `/api/health` | 模型就绪状态与设备 |
-
-> **安全提示：** 默认监听 `0.0.0.0:8001`，无身份认证，同一局域网内其他设备可能访问并修改数据。仅本机使用请保留快捷命令中的 `--host 127.0.0.1`，不要直接暴露到公网。只加载可信 `.pt` 文件，PyTorch pickle 文件可以执行代码。
-
-## 项目结构
+核心 Windows Agent 文件位于 `scripts/speakvideo/`：
 
 ```text
-.
-├── pyproject.toml             # 包元数据、依赖与 CLI
-├── config.example.toml        # 配置示例
-├── main.py                    # uvicorn main:app 兼容入口
-├── src/qwen3_tts_web/         # 服务、运行时、CLI、TUI
-│   ├── constraints/           # macOS / CUDA 固定依赖分支
-│   └── web/                   # 桌面 Web 界面
-├── scripts/                   # 跨平台引导与启动脚本
-├── models/                    # 模型，不提交
-├── pt/                        # 角色音色，不提交
-├── uploads/                   # 上传音频，不提交
-├── references/                # 参考音频，不提交
-└── output/                    # WAV 与 SQLite 语音库，不提交
+speakvideo_agent.py   Worker WSS、RPC 和任务队列
+voice_library.py      PT 音色导入、编辑、软删除和永久删除
+interface_docs.py     Mac 可查询的动态接口文档
+base_agent.py         协议基础类和 Qwen 客户端
+start.ps1 / stop.ps1  Windows 启停脚本
 ```
 
-管理环境为 `.venv-tools/`，推理环境为 `.venv/`，日志位于 `.logs/`。旧数据目录不迁移、不删除，新音频统一写入 `output/`。
+## 许可证
 
-## 项目配置
-
-- [依赖与打包配置](pyproject.toml)
-- [配置项示例](config.example.toml)
-
-服务启动后可访问 `/docs` 查看交互式 HTTP API。
-
-## 许可与致谢
-
-本项目使用 [MIT License](LICENSE)。上游代码及模型遵循各自许可证，分发时保留署名与许可文件。
-
-感谢 [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)、PyTorch、ModelScope、FastAPI 与 Textual 社区。
+本项目使用 [MIT License](LICENSE)。Qwen3-TTS、PyTorch、ModelScope、Hugging Face、FastAPI 等上游组件遵循各自许可证。

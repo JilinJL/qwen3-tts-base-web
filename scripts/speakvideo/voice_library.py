@@ -291,12 +291,36 @@ class VoiceLibrary:
         return self._detail(new)
 
     def delete(self, payload: dict) -> dict:
+        if payload.get("permanent") is True:
+            return self.delete_permanent(payload)
         paths = self._paths(payload.get("role"), payload.get("emotion"))
         if not paths["pt"].is_file():
             return {"deleted": True, "already_missing": True}
         self._check_sha(paths, payload.get("sha256", ""))
         trash_id = self._archive(paths, "delete")
         return {"deleted": True, "trash_id": trash_id, "remote_status": "deleted"}
+
+    def delete_permanent(self, payload: dict) -> dict:
+        """Permanently remove a PT asset and its sidecar files."""
+
+        paths = self._paths(payload.get("role"), payload.get("emotion"))
+        if not paths["pt"].is_file():
+            return {
+                "deleted": True,
+                "permanent": True,
+                "already_missing": True,
+                "remote_status": "deleted",
+            }
+        self._check_sha(paths, payload.get("sha256", ""))
+        detail = self._detail(paths)
+        for key in ("metadata", "reference", "pt"):
+            paths[key].unlink(missing_ok=True)
+        return {
+            "deleted": True,
+            "permanent": True,
+            "remote_status": "deleted",
+            "asset": detail,
+        }
 
     def reference(self, payload: dict) -> dict:
         paths = self._paths(payload.get("role"), payload.get("emotion"))
@@ -360,6 +384,8 @@ class VoiceLibrary:
             return self.edit(payload)
         if action == "delete":
             return self.delete(payload)
+        if action == "delete_permanent":
+            return self.delete_permanent(payload)
         if action == "reference":
             return self.reference(payload)
         if action == "trash":

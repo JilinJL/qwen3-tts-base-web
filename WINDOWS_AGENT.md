@@ -93,6 +93,20 @@ The worker also implements `worker.health`, `worker.metrics`, `job.query`,
 older feature list. The same machine-readable document is included by
 `worker.health` unless the request contains `include_docs: false`.
 
+Voice deletion has two explicit modes:
+
+- `voice.manage` with `payload.action = "delete"` soft-deletes the PT, metadata,
+  and reference WAV into `.speakvideo/voice-trash/`.
+- `voice.manage` with `payload.action = "delete_permanent"` verifies the
+  current PT SHA-256 and permanently removes the PT and its `.json`/`.wav`
+  sidecars without creating a trash entry.
+- The compatibility `voice.delete` RPC remains soft-delete by default. It
+  accepts `permanent: true` when an older client needs the permanent behavior.
+
+Both permanent forms require `role`, `emotion`, and the current `sha256` when
+the PT exists. A stale SHA is rejected so a delayed Mac request cannot delete a
+new asset that reused the same role and emotion.
+
 The capabilities document is token-free and contains the transport handshake,
 all worker RPCs and events, voice-management actions, payload limits, and the
 internal Qwen routes used by the worker. The Gateway must forward the generic

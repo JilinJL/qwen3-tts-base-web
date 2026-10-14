@@ -101,6 +101,51 @@ class VoiceLibraryTests(unittest.TestCase):
             self.assertTrue(restored["restored"])
             self.assertEqual(len(library.list_assets()["assets"]), 1)
 
+            permanent = library.manage(
+                {
+                    "action": "delete_permanent",
+                    "role": "renamed",
+                    "emotion": "quiet",
+                    "sha256": restored["asset"]["sha256"],
+                }
+            )
+            self.assertTrue(permanent["deleted"])
+            self.assertTrue(permanent["permanent"])
+            self.assertEqual(permanent["remote_status"], "deleted")
+            self.assertEqual(library.list_assets()["assets"], [])
+            self.assertEqual(library.trash()["trash"], [])
+            for filename in ("renamed_quiet.pt", "renamed_quiet.json", "renamed_quiet.wav"):
+                self.assertFalse((Path(directory) / "pt" / "renamed" / filename).exists())
+
+    def test_legacy_delete_entry_point_requires_explicit_permanent_flag(self):
+        with tempfile.TemporaryDirectory() as directory:
+            library = VoiceLibrary(Path(directory))
+            content = prompt_bytes()
+            asset = library.manage(
+                {
+                    "action": "import",
+                    "role": "tester",
+                    "emotion": "calm",
+                    "content_base64": base64.b64encode(content).decode("ascii"),
+                }
+            )
+            soft_deleted = library.delete(
+                {"role": "tester", "emotion": "calm", "sha256": asset["sha256"]}
+            )
+            self.assertTrue(soft_deleted["deleted"])
+            restored = library.restore({"id": soft_deleted["trash_id"]})
+
+            permanent = library.delete(
+                {
+                    "role": "tester",
+                    "emotion": "calm",
+                    "sha256": restored["asset"]["sha256"],
+                    "permanent": True,
+                }
+            )
+            self.assertTrue(permanent["permanent"])
+            self.assertFalse((Path(directory) / "pt" / "tester" / "tester_calm.pt").exists())
+
 
 class MetricsTests(unittest.TestCase):
     def test_metrics_shape_does_not_expose_job_text(self):
@@ -147,7 +192,16 @@ class ProtocolExtensionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("worker.capabilities", rpc_types)
         self.assertEqual(
             set(result["result"]["voice_manage_actions"]),
-            {"list", "import", "edit", "delete", "reference", "trash", "restore"},
+            {
+                "list",
+                "import",
+                "edit",
+                "delete",
+                "delete_permanent",
+                "reference",
+                "trash",
+                "restore",
+            },
         )
 
     async def test_hello_advertises_durable_rpc_capabilities(self):

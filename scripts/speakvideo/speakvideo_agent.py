@@ -210,6 +210,7 @@ class SpeakVideoAgent(Agent):
                             worker_id=self.settings.worker_id,
                             capabilities={
                                 "voice_manage": True,
+                                "voice_permanent_delete": True,
                                 "voice_reference": True,
                                 "metrics": True,
                                 "interface_docs": True,
@@ -335,6 +336,7 @@ class SpeakVideoAgent(Agent):
                             "rpc": True,
                             "correlated_acks": True,
                             "interface_docs": True,
+                            "voice_permanent_delete": True,
                         },
                     }
                 )
